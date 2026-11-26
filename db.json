@@ -724,6 +724,30 @@
         "status": "pending",
         "passwordHash": "e0925665e2107e1292711c3bbc4e5be0:4c79a902b57c64ded06a953e1ccd099845cb134a9c3ca4ed3b0ba517fcb396fcb0218fc4f7079afcf65edf15225ce7aea41fa7eef0f359e5f02fb56bafbb9355"
       }
+    },
+    {
+      "nhrId": "NHR-JZVFUVEOZR",
+      "nid": "0692410005101060",
+      "fullName": "CSE23_30_OISHO OLIVER GUDA",
+      "email": "ab@gmail.com",
+      "uid": "jZvfuvEoZreTJjk0kLjK1YUwb973",
+      "patientActive": true
+    },
+    {
+      "nhrId": "NHR-N3BKUBD2VC",
+      "nid": "0692410005101069",
+      "fullName": "CSE23_30_OISHO OLIVER GUDA",
+      "email": "abc@gmail.com",
+      "uid": "N3Bkubd2VcdQ7cWyF0zf8BG2FEi1",
+      "patientActive": true
+    },
+    {
+      "nhrId": "NHR-5XSV3Z2OWF",
+      "nid": "0692410005101055",
+      "fullName": "Rakib Al Hasan",
+      "email": "rakib@gmail.com",
+      "uid": "5XSV3z2OWfVA1R2WDM76kFRXcLz2",
+      "patientActive": true
     }
   ],
   "credentials": [
@@ -838,6 +862,30 @@
       "alg": -7,
       "rpId": "retract-rinsing-straggler.ngrok-free.dev",
       "createdAt": "2026-11-07T14:56:31.253Z"
+    },
+    {
+      "userId": "NHR-JZVFUVEOZR",
+      "credentialId": "ASZwl2iWQb80q2Xaew7HbcG-Pb_sZLmY_rv9oC1mjMPCcuk4GDWotBdvc_Wn-61powojWFaKQfAdVI_7W3zAK74",
+      "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEi3YxO_T118b41cRzMLgRXjpRsCN-_S7tfaaU4jVSdgYI9bGiREV8sc9HDpBHcTcneE9_KJDqb-0FT1tfLyMoRQ",
+      "alg": -7,
+      "rpId": "animated-broccoli-qv6qj4qxxv5v36v5-5000.app.github.dev",
+      "createdAt": "2026-11-26T12:24:20.190Z"
+    },
+    {
+      "userId": "NHR-N3BKUBD2VC",
+      "credentialId": "AQ9ozuco0DofBfhrIMiKWM6wkiR0OVN2Tuwzgmlt-eF9TewDLC4xABEcrvxtqcFYCguFlO7orIU3av6tlNLJxBo",
+      "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEwHsOLVgq2jW85ylUtfsuZ-nWPnImWR-lCPaJ5Dz-aDQFqob5LMji9mvvZVj7ZOyEu0rVKKKF2ljOsMyPLTH5Lw",
+      "alg": -7,
+      "rpId": "animated-broccoli-qv6qj4qxxv5v36v5-5000.app.github.dev",
+      "createdAt": "2026-11-26T12:32:34.758Z"
+    },
+    {
+      "userId": "NHR-5XSV3Z2OWF",
+      "credentialId": "AWAyUkKw6FKUBerNouo6EiH280IfgqunZIzlUIG9X444ln0YIwUSgzxs6qRg7S6srbAu3uJkmyNeSBtG8t3WOeg",
+      "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAErdR04uBsa639PCgi7BG6a4g1XG6YoxTPJD4p_-G9wQm2JU_o704ZoL4NZ0-J7UYE0cpEZ3ms5AunoaCWbe4gVA",
+      "alg": -7,
+      "rpId": "animated-broccoli-qv6qj4qxxv5v36v5-5000.app.github.dev",
+      "createdAt": "2026-11-26T12:39:41.163Z"
     }
   ],
   "records": [

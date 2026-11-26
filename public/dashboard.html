@@ -413,7 +413,7 @@ const badge=(n)=>{const l=LEVELS.find((x)=>n>=x[0]);return l?{key:l[1],icon:l[2]
 
 /* ===== Session and API Client ===== */
 function readSession(){for(const st of [sessionStorage,localStorage]){try{const v=JSON.parse(st.getItem("nhr_session"));if(v&&v.token)return v}catch(e){}}return null}
-function clearSession(){localStorage.removeItem("nhr_session");sessionStorage.removeItem("nhr_session")}
+function clearSession(){localStorage.removeItem("nhr_session");sessionStorage.removeItem("nhr_session");localStorage.removeItem("nhr_user")}
 const ses=readSession();
 
 async function api(url,body,method){
@@ -1080,7 +1080,7 @@ $("editEmBtn").onclick=()=>{
 };
 
 $("addFp").onclick=async()=>{
-  const pollKey=randHex(16),r=await api("/api/fp/session-ticket",{pollKey,lang});
+  const pollKey=randHex(16),r=await api("/api/fp/session-ticket",{pollKey,lang,fbUser:P?{uid:P.uid,nid:P.nid||P.nidNumber||P.identity?.nid||""||P.identity?.nid||"",fullName:P.fullName||P.name,email:P.email,nhrId:P.nhrId}:null});
   if(!r.ok)return toast(errText(r.data.error));
   let timer=null;
   openModal({title:t("qrTitle"),desc:t("qrDesc"),go:"OK",

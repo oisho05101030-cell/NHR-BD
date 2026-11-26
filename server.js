@@ -69,9 +69,10 @@ function ageOf(dob) {
 const nidInRange = (n) => Number(n) >= 692410005101001 && Number(n) <= 692410005101050;
 const bad = (res, error, code = 400, extra = {}) => res.status(code).json(Object.assign({ error }, extra));
 const hostOf = (req) => String(req.get("x-forwarded-host") || req.get("host") || "").split(",")[0].trim();
-const originOf = (req) => String(req.get("x-forwarded-proto") || req.protocol).split(",")[0].trim() + "://" + hostOf(req);
-const baseOf = (req) => PUBLIC_URL || originOf(req);
-const rpHostOf = (req) => (PUBLIC_URL ? new URL(PUBLIC_URL).hostname : hostOf(req).split(":")[0]);
+const isLocal = (h) => !h || /^localhost(?::|$)|^127\.0\.0\.1(?::|$)/.test(h);
+const originOf = (req) => { const h = hostOf(req); return !isLocal(h) ? (String(req.get("x-forwarded-proto") || "https").split(",")[0].trim() + "://" + h) : (PUBLIC_URL || "http://" + h); };
+const baseOf = (req) => originOf(req);
+const rpHostOf = (req) => new URL(originOf(req)).hostname;
 
 function newNhrId() {
   let id;
@@ -323,26 +324,12 @@ function getTicket(id) {
 }
 const goodPoll = (v) => typeof v === "string" && /^[a-f0-9]{16,64}$/.test(v);
 
-app.post("/api/fp/ticket", (req, res) => {
-  const { nid, key, pollKey, lang } = req.body || {};
-  const k = enrollKeys.get(s(nid));
-  if (!k || k.exp < Date.now() || k.key !== key || !goodPoll(pollKey)) return bad(res, "serverErr", 403);
-  const user = db.users.find((u) => u.nid === s(nid));
-  if (!user) return bad(res, "noUser", 404);
-  const t = newTicket({ purpose: "enroll", userId: user.nhrId, name: user.fullName, pollKey, lang: lang === "bn" ? "bn" : "en" });
-  res.json({ ticket: t.id, base: baseOf(req) });
-});
+function ensureFb(f){if(!f)return null;const nid=String(f.nid||"").replace(/\D/g,""),nhrId=s(f.nhrId),uid=s(f.uid);if(!/^\d{16}$/.test(nid)&&!nhrId&&!uid)return null;let u=db.users.find(v=>(/^\d{16}$/.test(nid)&&v.nid===nid)||(nhrId&&v.nhrId===nhrId)||(uid&&v.uid===uid));if(!u){u={nhrId:nhrId||"NHR-"+Math.random().toString(36).slice(2,11).toUpperCase(),nid:/^\d{16}$/.test(nid)?nid:"",fullName:s(f.fullName)||"NHR User",email:s(f.email),uid,patientActive:true};db.users.push(u)}else{if(/^\d{16}$/.test(nid)&&!u.nid)u.nid=nid;if(uid)u.uid=uid;if(f.email)u.email=s(f.email);if(f.fullName)u.fullName=s(f.fullName)}if(typeof save==="function")save();return u}
+app.post("/api/fp/ticket",(req,res)=>{const{nid,key,pollKey,lang,fbUser}=req.body||{};if(!goodPoll(pollKey))return bad(res,"serverErr",403);let u=fbUser?ensureFb(fbUser):null;if(!u){const k=enrollKeys.get(s(nid));if(!k||k.exp<Date.now()||k.key!==key)return bad(res,"serverErr",403);u=db.users.find(v=>v.nid===s(nid))}if(!u)return bad(res,"noUser",404);const t=newTicket({purpose:"enroll",userId:u.nhrId,name:u.fullName,pollKey,lang:lang==="bn"?"bn":"en"});res.json({ticket:t.id,base:baseOf(req)})});
 
-app.post("/api/fp/session-ticket", (req, res) => {
-  const x = getSes(req); if (!x || x.type !== "nid") return bad(res, "noSession", 401);
-  const { pollKey, lang } = req.body || {};
-  if (!goodPoll(pollKey)) return bad(res, "serverErr");
-  const u = db.users.find((v) => v.nhrId === x.nhrId); if (!u) return bad(res, "noUser", 404);
-  const t = newTicket({ purpose: "enroll", userId: u.nhrId, name: u.fullName, pollKey, lang: lang === "bn" ? "bn" : "en" });
-  res.json({ ticket: t.id, base: baseOf(req) });
-});
+app.post("/api/fp/session-ticket",(req,res)=>{const{pollKey,lang,fbUser}=req.body||{};if(!goodPoll(pollKey))return bad(res,"serverErr");let u=fbUser?ensureFb(fbUser):null;if(!u){const x=getSes(req);if(!x||x.type!=="nid")return bad(res,"noSession",401);u=db.users.find(v=>v.nhrId===x.nhrId)}if(!u)return bad(res,"noUser",404);const t=newTicket({purpose:"enroll",userId:u.nhrId,name:u.fullName,pollKey,lang:lang==="bn"?"bn":"en"});res.json({ticket:t.id,base:baseOf(req)})});
 
-app.post("/api/fp/login-ticket", (req, res) => {
+app.post("/api/fp/login-ticket",(req,res)=>{if(req.body&&req.body.fbUser)ensureFb(req.body.fbUser);
   const { id, pollKey, lang } = req.body || {};
   if (!/^\d{16}$/.test(s(id)) || !goodPoll(pollKey)) return bad(res, "fpNidOnly");
   const user = db.users.find((u) => u.nid === s(id));
@@ -375,7 +362,7 @@ app.post("/api/fp/ticket/:id/enroll", (req, res) => {
     if (cd.type !== "webauthn.create" || cd.challenge !== t.challenge || cd.origin !== originOf(req)) return bad(res, "fpBad");
     if (![-7, -257].includes(Number(b.alg)) || !b.rawId || !b.publicKey) return bad(res, "fpBad");
     crypto.createPublicKey({ key: b64u.dec(b.publicKey), format: "der", type: "spki" });
-    const rpId = hostOf(req).split(":")[0];
+    const rpId = rpHostOf(req);
     db.credentials = db.credentials.filter((c) => !(c.userId === t.userId && c.rpId === rpId));
     db.credentials.push({ userId: t.userId, credentialId: b.rawId, publicKey: b.publicKey, alg: Number(b.alg), rpId, createdAt: new Date().toISOString() });
     save();
@@ -396,7 +383,7 @@ app.post("/api/fp/ticket/:id/assert", (req, res) => {
     const cd = JSON.parse(cdRaw.toString("utf8"));
     if (cd.type !== "webauthn.get" || cd.challenge !== t.challenge || cd.origin !== originOf(req)) return bad(res, "fpBad");
     const authData = b64u.dec(b.authenticatorData);
-    if (!authData.subarray(0, 32).equals(sha256(Buffer.from(hostOf(req).split(":")[0])))) return bad(res, "fpBad");
+    if (!authData.subarray(0, 32).equals(sha256(Buffer.from(rpHostOf(req))))) return bad(res, "fpBad");
     const flags = authData[32];
     if (!(flags & 1) || !(flags & 4)) return bad(res, "fpBad");
     const signed = Buffer.concat([authData, sha256(cdRaw)]);
@@ -408,7 +395,7 @@ app.post("/api/fp/ticket/:id/assert", (req, res) => {
     if (t.doctorToken) return res.json({ ok: true });
     reactivate(user);
     t.token = makeSession({ type: "nid", name: user.fullName, nhrId: user.nhrId });
-    t.user = { type: "nid", name: user.fullName, nhrId: user.nhrId };
+    t.user = { type: "nid", name: user.fullName, nhrId:user.nhrId,uid:user.uid||"",email:user.email||"",nid:user.nid||""};
     res.json({ ok: true });
   } catch (err) { bad(res, "fpBad"); }
 });
@@ -542,7 +529,7 @@ app.post("/api/fp/direct-enroll", (req, res) => {
     if (cd.type !== "webauthn.create" || cd.challenge !== c.challenge || cd.origin !== originOf(req)) return bad(res, "fpBad");
     if (![-7, -257].includes(Number(b.alg)) || !b.rawId || !b.publicKey) return bad(res, "fpBad");
     crypto.createPublicKey({ key: b64u.dec(b.publicKey), format: "der", type: "spki" });
-    const rpId = hostOf(req).split(":")[0];
+    const rpId = rpHostOf(req);
     db.credentials = db.credentials.filter((k) => !(k.userId === x.nhrId && k.rpId === rpId));
     db.credentials.push({ userId: x.nhrId, credentialId: b.rawId, publicKey: b.publicKey, alg: Number(b.alg), rpId, createdAt: new Date().toISOString() });
     save(); res.json({ ok: true });

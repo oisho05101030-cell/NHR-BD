@@ -914,7 +914,7 @@
         $("issuedId").textContent = result.nhrId || "";
         $("issuedDocId").textContent = result.doctorId || "";
         $("docNote").hidden = !isDoc();
-        show("doneView");
+        show("doneView");if(!docOnly&&payload.nid){lastEnroll={nid:payload.nid,key:"fb",fbUser:{uid:result.uid||(window.auth&&auth.currentUser?auth.currentUser.uid:""),nid:payload.nid,fullName:payload.fullName||payload.name||"NHR User",email:payload.email||"",nhrId:result.nhrId||""}};startEnroll();}
 
         $("goNow").onclick = (ev) => {
           ev.preventDefault();
@@ -954,7 +954,7 @@
       fpDone = false; $("fpStatus").className = "fp-status"; $("qrRetry").hidden = true;
       $("qrContainer").hidden = false; $("fpStatusText").textContent = t("waitingFp");
       const pollKey = randHex(16);
-      const r = await api("/api/fp/ticket", { nid: lastEnroll.nid, key: lastEnroll.key, pollKey, lang });
+      const r = await api("/api/fp/ticket", { nid: lastEnroll.nid, key: lastEnroll.key, fbUser: lastEnroll.fbUser, pollKey, lang });
       if (!r.ok) { $("fpStatusText").textContent = t(I18N.en[r.data.error] ? r.data.error : "serverErr"); return; }
 
       $("qrcode").innerHTML = "";
@@ -965,7 +965,7 @@
         const s = await api("/api/fp/ticket/" + r.data.ticket + "/status?k=" + pollKey, null, "GET");
         if (s.data.status === "done") {
           clearInterval(pollTimer); fpDone = true;
-          $("fpStatus").className = "fp-status done"; $("fpStatusText").textContent = t("fpSuccess");
+          $("fpStatus").className = "fp-status done"; $("fpStatusText").textContent = t("fpSuccess");try{if(window.db&&lastEnroll.fbUser&&lastEnroll.fbUser.uid)await window.db.collection("users").doc(lastEnroll.fbUser.uid).update({hasFingerprint:true})}catch(e){}
         } else if (s.data.status === "expired") {
           clearInterval(pollTimer);
           $("fpStatusText").textContent = t("fpExpired"); $("qrRetry").hidden = false;
