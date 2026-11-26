@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NHR BD</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { min-height: 100vh; display: grid; place-items: center; padding: 20px; color: #1b2d42; font-family: "Plus Jakarta Sans", "Hind Siliguri", system-ui, sans-serif; background: linear-gradient(160deg, #bfe4fb, #f4faff 60%, #fff); }
+    body.bn { font-family: "Hind Siliguri", "Plus Jakarta Sans", system-ui, sans-serif; }
+    .card { width: 100%; max-width: 400px; background: #fff; border-radius: 28px; padding: 34px 26px 30px; text-align: center; box-shadow: 0 30px 60px -20px rgba(10,90,150,.28); animation: up .6s cubic-bezier(.2,.8,.2,1) both; }
+    @keyframes up { from { opacity: 0; transform: translateY(22px); } }
+    .mark { width: 46px; height: 46px; margin: 0 auto 14px; border-radius: 14px; display: grid; place-items: center; color: #fff; font-size: 28px; font-weight: 800; background: linear-gradient(135deg, #12b4d8, #0a7fc4); }
+    h1 { font-size: 22px; font-weight: 800; color: #0c3b5e; line-height: 1.3; }
+    p { margin-top: 10px; font-size: 15px; line-height: 1.55; color: #5b6b80; }
+    .fp { position: relative; width: 104px; height: 104px; margin: 26px auto 22px; border-radius: 50%; display: grid; place-items: center; background: #e6f4fc; color: #0a86cc; }
+    .fp::after { content: ""; position: absolute; inset: -9px; border-radius: 50%; border: 2px solid #0a86cc; opacity: .35; animation: pulse 1.8s ease-out infinite; }
+    @keyframes pulse { from { transform: scale(.9); opacity: .5; } to { transform: scale(1.18); opacity: 0; } }
+    .fp svg { width: 54px; height: 54px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+    .fp.ok { background: #e3f7ee; color: #12a150; } .fp.ok::after { border-color: #12a150; animation: none; opacity: 0; }
+    .fp.err { background: #fdecee; color: #d92d3a; } .fp.err::after { animation: none; opacity: 0; }
+    .fp.work::after { animation-duration: 1s; }
+    button { width: 100%; height: 54px; border: none; border-radius: 14px; font: inherit; font-size: 16px; font-weight: 700; color: #fff; cursor: pointer; background: linear-gradient(90deg, #0a86cc, #05609f); box-shadow: 0 12px 24px -10px rgba(5,96,159,.7); }
+    button:disabled { opacity: .6; }
+    [hidden] { display: none !important; }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="mark">+</div>
+    <h1 id="title"></h1>
+    <p id="msg"></p>
+    <div class="fp" id="fp">
+      <svg viewBox="0 0 24 24"><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M2 12a10 10 0 0 1 18-6"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .131-5.354 0-6"/><path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M9 6.8a6 6 0 0 1 9 5.2v2"/></svg>
+    </div>
+    <button type="button" id="go" hidden></button>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const S = {
+      en: {
+        hi: "Hi, {name}", enrollMsg: "Tap the button, then place your finger on the sensor to save your fingerprint for NHR BD sign-in.",
+        loginMsg: "Tap the button, then place your finger on the sensor to sign in on your computer.",
+        btnEnroll: "Save my fingerprint", btnLogin: "Confirm with fingerprint", working: "Waiting for your fingerprint...",
+        okEnroll: "Fingerprint saved! You can close this page and go back to your computer.",
+        okLogin: "Done! You are signed in on your computer. You can close this page.",
+        errSecure: "Fingerprint needs a secure (https) page. Open the link from your https address.",
+        errUnsupported: "This phone or browser can't use fingerprint here.",
+        errCancel: "The fingerprint check was cancelled. Tap the button to try again.",
+        errExpired: "This QR code has expired. Go back to your computer and create a new one.",
+        errUsed: "This QR code was already used.", errServer: "Can't reach the server.", errVerify: "We couldn't verify the fingerprint. Try again."
+      },
+      bn: {
+        hi: "স্বাগতম, {name}", enrollMsg: "বাটনে চাপ দিয়ে সেন্সরে আঙুল রাখুন, এনএইচআর বিডি সাইন ইনের জন্য আপনার ফিঙ্গারপ্রিন্ট সংরক্ষিত হবে।",
+        loginMsg: "বাটনে চাপ দিয়ে সেন্সরে আঙুল রাখুন, আপনার কম্পিউটারে সাইন ইন হয়ে যাবে।",
+        btnEnroll: "আমার ফিঙ্গারপ্রিন্ট সংরক্ষণ করুন", btnLogin: "ফিঙ্গারপ্রিন্ট দিয়ে নিশ্চিত করুন", working: "ফিঙ্গারপ্রিন্টের অপেক্ষায়...",
+        okEnroll: "ফিঙ্গারপ্রিন্ট সংরক্ষিত হয়েছে! এই পেজ বন্ধ করে কম্পিউটারে ফিরে যান।",
+        okLogin: "হয়ে গেছে! আপনার কম্পিউটারে সাইন ইন হয়েছে। এই পেজ বন্ধ করতে পারেন।",
+        errSecure: "ফিঙ্গারপ্রিন্টের জন্য নিরাপদ (https) পেজ লাগে। আপনার https ঠিকানা থেকে লিংকটি খুলুন।",
+        errUnsupported: "এই ফোন বা ব্রাউজারে ফিঙ্গারপ্রিন্ট ব্যবহার করা যাচ্ছে না।",
+        errCancel: "ফিঙ্গারপ্রিন্ট যাচাই বাতিল হয়েছে। আবার চেষ্টা করতে বাটনে চাপ দিন।",
+        errExpired: "এই QR কোডের মেয়াদ শেষ। কম্পিউটারে ফিরে নতুন কোড তৈরি করুন।",
+        errUsed: "এই QR কোড আগেই ব্যবহার করা হয়েছে।", errServer: "সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না।", errVerify: "ফিঙ্গারপ্রিন্ট যাচাই করা যায়নি। আবার চেষ্টা করুন।"
+      }
+    };
+    let L = S.en, T = null;
+    const b64u = {
+      enc: (b) => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""),
+      dec: (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0))
+    };
+    const tid = new URLSearchParams(location.search).get("t");
+
+    function fatal(key) { $("title").textContent = "NHR BD"; $("msg").textContent = L[key]; $("fp").className = "fp err"; $("go").hidden = true; }
+    async function post(path, body) {
+      try { const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); return r.ok; }
+      catch (e) { return false; }
+    }
+
+    async function init() {
+      let res;
+      try { res = await fetch("/api/fp/ticket/" + encodeURIComponent(tid || "")); } catch (e) { return fatal("errServer"); }
+      if (!res.ok) return fatal("errExpired");
+      T = await res.json();
+      L = S[T.lang === "bn" ? "bn" : "en"];
+      document.body.classList.toggle("bn", T.lang === "bn");
+      if (T.status !== "pending") return fatal("errUsed");
+      if (!window.isSecureContext || !window.PublicKeyCredential) return fatal(window.isSecureContext ? "errUnsupported" : "errSecure");
+      $("title").textContent = L.hi.replace("{name}", T.name);
+      $("msg").textContent = T.purpose === "enroll" ? L.enrollMsg : L.loginMsg;
+      $("go").textContent = T.purpose === "enroll" ? L.btnEnroll : L.btnLogin;
+      $("go").hidden = false;
+    }
+
+    $("go").addEventListener("click", async () => {
+      $("go").disabled = true; $("fp").className = "fp work"; $("msg").textContent = L.working;
+      try {
+        let ok;
+        if (T.purpose === "enroll") {
+          const cred = await navigator.credentials.create({ publicKey: {
+            challenge: b64u.dec(T.challenge),
+            rp: { name: "NHR BD" },
+            user: { id: b64u.dec(T.userHandle), name: T.label, displayName: T.name },
+            pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+            authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required", residentKey: "discouraged" },
+            timeout: 60000, attestation: "none"
+          }});
+          const r = cred.response;
+          if (!r.getPublicKey || !r.getPublicKey()) throw new Error("unsupported");
+          ok = await post("/api/fp/ticket/" + tid + "/enroll", {
+            rawId: b64u.enc(cred.rawId), clientDataJSON: b64u.enc(r.clientDataJSON),
+            publicKey: b64u.enc(r.getPublicKey()), alg: r.getPublicKeyAlgorithm()
+          });
+        } else {
+          const a = await navigator.credentials.get({ publicKey: {
+            challenge: b64u.dec(T.challenge),
+            allowCredentials: [{ type: "public-key", id: b64u.dec(T.credentialId), transports: ["internal"] }],
+            userVerification: "required", timeout: 60000
+          }});
+          ok = await post("/api/fp/ticket/" + tid + "/assert", {
+            credentialId: b64u.enc(a.rawId), clientDataJSON: b64u.enc(a.response.clientDataJSON),
+            authenticatorData: b64u.enc(a.response.authenticatorData), signature: b64u.enc(a.response.signature)
+          });
+        }
+        if (!ok) throw new Error("verify");
+        $("fp").className = "fp ok"; $("go").hidden = true;
+        $("msg").textContent = T.purpose === "enroll" ? L.okEnroll : L.okLogin;
+      } catch (err) {
+        $("fp").className = "fp err"; $("go").disabled = false;
+        $("msg").textContent = err.name === "NotAllowedError" ? L.errCancel : err.message === "unsupported" ? L.errUnsupported : L.errVerify;
+      }
+    });
+    init();
+  </script>
+</body>
+</html>

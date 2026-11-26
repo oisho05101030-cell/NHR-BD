@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- Firebase SDKs Integration -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Facility Portal | NHR BD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<style>
+:root{
+  --navy:#0c3b5e;--blue:#0a8fc7;--gradient:linear-gradient(135deg,#0c3b5e,#0a8fc7);
+  --line:#d9e5f0;--text:#1b2d42;--muted:#5b6b80;--err:#d92d3a;--ok:#12a150;--warn:#d97706;
+  --bg-gradient:radial-gradient(800px 600px at 10% 10%,rgba(10,143,199,.15),transparent 70%),linear-gradient(120deg,#eef7fc,#f4fbff 50%,#fff);
+  --font:"Plus Jakarta Sans","Hind Siliguri",system-ui,sans-serif
+}
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+body{font-family:var(--font);color:var(--text);min-height:100vh;background:var(--bg-gradient);background-attachment:fixed}
+body.bn{font-family:"Hind Siliguri","Plus Jakarta Sans",system-ui,sans-serif}
+svg.i{width:1.1em;height:1.1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+button,input,select,textarea{font:inherit}
+:focus-visible{outline:3px solid rgba(10,143,199,.4);outline-offset:2px}
+
+/* Header & Top Bar */
+.top{height:72px;position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;padding:0 24px;background:rgba(255,255,255,.92);backdrop-filter:blur(16px);border-bottom:1px solid rgba(10,100,170,.12)}
+.hl,.hr{display:flex;align-items:center;gap:14px}
+.burger{width:44px;height:44px;border:1px solid #d3e3f0;background:#fff;border-radius:12px;font-size:22px;color:var(--navy);cursor:pointer;display:grid;place-items:center;transition:.2s}
+.burger:hover{background:#eaf4fb}
+.logo{display:flex;align-items:center;gap:10px}
+.lm{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;color:#fff;font-size:22px;background:var(--gradient)}.lm svg{stroke-width:3}
+.logo b{display:block;font-size:20px;font-weight:800;color:var(--navy);line-height:1.1}.logo b span{color:var(--blue)}.logo small{font-size:12px;color:var(--muted)}
+.lang{display:flex;gap:2px;padding:4px;background:#e9f1f8;border-radius:999px;border:1px solid #d3e3f0}
+.lang button{border:none;background:none;padding:6px 14px;border-radius:999px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer}
+.lang button[aria-pressed=true]{background:#fff;color:#0a6fa8;box-shadow:0 2px 6px rgba(10,100,170,.18)}
+.av{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-weight:800;color:#fff;background:var(--gradient);flex:none;cursor:pointer;box-shadow:0 4px 12px rgba(10,143,199,.25)}
+
+/* Drawer Side Navigation */
+.scrim{position:fixed;inset:0;z-index:50;background:rgba(12,59,94,.45);backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity .25s}.scrim.open{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;bottom:0;left:0;width:310px;max-width:86vw;z-index:55;display:flex;flex-direction:column;background:#fff;transform:translateX(-102%);transition:transform .3s cubic-bezier(.2,.8,.2,1);box-shadow:0 0 60px rgba(0,0,0,.2)}.drawer.open{transform:none}
+.dh{padding:24px 20px;color:#fff;background:var(--gradient);display:flex;align-items:center;gap:14px}
+.dh .av{width:50px;height:50px;background:rgba(255,255,255,.2);border:2px solid rgba(255,255,255,.5)}
+.dh b{display:block;font-size:16px;line-height:1.2}.dh small{font-size:12px;opacity:.9;font-family:ui-monospace,Consolas,monospace}
+.dx{margin-left:auto;border:none;background:rgba(255,255,255,.2);color:#fff;width:34px;height:34px;border-radius:10px;font-size:18px;cursor:pointer}
+.dn{flex:1;overflow:auto;padding:16px 12px}
+.nav{display:flex;align-items:center;gap:12px;width:100%;padding:13px 16px;margin-bottom:6px;border:none;background:none;border-radius:14px;font-size:15px;font-weight:700;color:var(--muted);cursor:pointer;text-align:left;transition:.2s}
+.nav svg{font-size:22px}.nav:hover{background:#eaf4fb;color:#0a6fa8}
+.nav.on{background:var(--gradient);color:#fff;box-shadow:0 8px 20px -6px rgba(10,143,199,.4)}
+.nav.out:hover{background:#fdecee;color:var(--err)}
+.df{padding:12px 14px 18px;border-top:1px solid #e3edf5}
+
+/* Dashboard UI Layout */
+.main{padding:28px 28px 80px;max-width:1040px;margin:0 auto;width:100%}
+.sec{display:none}.sec.on{display:block}
+
+/* Header Welcome Banner */
+.welcome-card{background:var(--gradient);color:#fff;border-radius:24px;padding:26px 30px;margin-bottom:24px;box-shadow:0 18px 40px -15px rgba(10,100,170,.35);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
+.welcome-card h1{font-size:26px;font-weight:800;color:#fff}
+.welcome-card p{opacity:.9;font-size:14px;margin-top:4px}
+.welcome-badge{background:rgba(255,255,255,.2);backdrop-filter:blur(10px);padding:8px 16px;border-radius:999px;font-size:13px;font-weight:700;border:1px solid rgba(255,255,255,.3)}
+
+.sub{margin:6px 0 22px;font-size:14.5px;color:var(--muted);line-height:1.5}
+.panel{background:rgba(255,255,255,.95);border:1px solid #fff;border-radius:22px;padding:24px 26px;box-shadow:0 16px 36px -18px rgba(10,100,170,.2);margin-bottom:22px}
+.panel h3{font-size:17px;font-weight:800;color:var(--navy);margin-bottom:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 24px;border:none;border-radius:14px;font-weight:700;color:#fff;cursor:pointer;background:linear-gradient(90deg,#0a86cc,#05609f);box-shadow:0 6px 18px -4px rgba(10,134,204,.3);transition:.2s}
+.btn:hover{transform:translateY(-1px);box-shadow:0 10px 24px -4px rgba(10,134,204,.4)}
+.btn.ok{background:linear-gradient(90deg,#12a150,#0c7a3d)}.btn.ghost{background:#fff;color:var(--text);border:1.5px solid var(--line);box-shadow:none}.btn.sm{padding:8px 16px;font-size:13.5px}
+.btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+
+.inp{width:100%;height:50px;padding:0 16px;border:1.5px solid var(--line);border-radius:14px;background:#fff;outline:none;transition:.2s}
+.inp:focus{border-color:var(--blue);box-shadow:0 0 0 4px rgba(10,143,199,.15)}
+textarea.inp{height:auto;padding:14px;min-height:90px;resize:vertical}
+.srow{display:flex;gap:12px;flex-wrap:wrap}.srow .inp{flex:1;min-width:220px;font-family:ui-monospace,Consolas,monospace;font-size:18px;letter-spacing:.06em}
+.err{color:var(--err);font-size:13.5px;min-height:20px;margin-top:8px;font-weight:600}
+.lbl{display:block;font-size:13px;font-weight:700;color:var(--muted);margin:14px 0 6px}
+
+/* Newborn Birth ID Credential Card */
+.cred-box{background:linear-gradient(135deg,#e0f2fe,#bae6fd);border:1.5px dashed #0284c7;border-radius:18px;padding:20px;margin-top:16px;color:var(--navy)}
+.cred-box h4{font-size:16px;margin-bottom:8px;color:#0369a1}
+.cred-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(2,132,199,.2)}
+.cred-row:last-child{border-bottom:none}
+.cred-val{font-family:ui-monospace,Consolas,monospace;font-size:18px;font-weight:800;letter-spacing:.05em}
+
+/* Patient Card & Verification */
+.pcard{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:16px;background:#f4fbff;border-radius:16px;border:1px solid #b9dcf3}
+.pcard .av{width:56px;height:56px;font-size:20px}
+.pcard b{display:block;font-size:18px;color:var(--navy)}.pcard small{color:var(--muted);font-size:13.5px}
+.lock{margin-left:auto;font-size:12.5px;font-weight:800;padding:6px 14px;border-radius:999px;background:#fff4e0;color:#8a6200;border:1px solid #ffe0b2}
+.vm{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:12px 0 18px}
+.vm button{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;padding:18px;border:1.5px solid var(--line);background:#fff;border-radius:18px;cursor:pointer;color:var(--navy);font-weight:800;transition:.2s}
+.vm button svg{font-size:26px;color:var(--blue)}.vm button small{font-weight:500;color:var(--muted);font-size:12.5px;line-height:1.4}
+.vm button.on{border-color:#0a86cc;box-shadow:0 0 0 4px rgba(10,134,204,.15);background:#f4fbff}
+.vbody{padding:20px;border-radius:18px;background:#f6fafd;border:1px solid #e3edf5}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.chip{border:1.5px solid var(--line);background:#fff;color:var(--muted);padding:8px 16px;border-radius:999px;font-size:13px;font-weight:700;cursor:pointer;transition:.2s}.chip:hover,.chip.on{border-color:var(--blue);color:#0a6fa8;background:#f0f8ff}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.rw{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.2fr) minmax(0,.8fr) minmax(0,1.3fr) minmax(0,1fr) 36px;gap:8px;margin-bottom:8px;align-items:center}
+.rw .inp{height:44px;font-size:14px;padding:0 10px}
+.rh{font-size:12px;font-weight:700;color:var(--muted)}
+.x{width:36px;height:36px;border:none;border-radius:10px;background:#fdecee;color:var(--err);cursor:pointer;font-size:15px}
+.add{margin-top:8px;border:1.5px dashed #9db3cb;background:none;color:#0a6fa8;font-weight:700;border-radius:14px;padding:12px 18px;cursor:pointer;width:100%}
+
+/* Modals & Camera QR Scanner */
+.modal{position:fixed;inset:0;z-index:70;display:grid;place-items:center;padding:20px;background:rgba(12,59,94,.45);backdrop-filter:blur(6px)}
+.mcard{width:100%;max-width:460px;background:#fff;border-radius:26px;padding:28px;box-shadow:0 20px 50px rgba(0,0,0,.2)}
+.mcard h3{color:var(--navy);margin-bottom:8px}.mcard p{font-size:14px;color:var(--muted);margin-bottom:14px}
+.mrow{display:flex;gap:12px;margin-top:16px}.mrow .btn{flex:1}
+.vid{width:100%;border-radius:18px;background:#0c3b5e;aspect-ratio:4/3;object-fit:cover}
+
+#toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:80;background:var(--navy);color:#fff;padding:14px 24px;border-radius:14px;font-size:14px;font-weight:600;box-shadow:0 16px 32px -10px rgba(0,0,0,.4);max-width:92vw;text-align:center}
+@media(max-width:820px){.main{padding:18px 16px 60px}.vm,.g2{grid-template-columns:1fr}.logo small{display:none}.rw{grid-template-columns:1fr 1fr;padding:12px;border:1px solid var(--line);border-radius:14px;background:#fff}.rw .nm{grid-column:1/3}.rh{display:none}}
+</style>
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+
+<!-- Drawer Navigation -->
+<aside class="drawer" id="drawer" aria-label="Menu">
+  <div class="dh">
+    <div class="av" id="dAv">L</div>
+    <div><b id="dName">Facility Portal</b><small id="dId">L00000000</small></div>
+    <button class="dx" id="dClose" aria-label="Close">✕</button>
+  </div>
+  <nav class="dn" id="nav"></nav>
+  <div class="df"><button class="nav out" id="logout"></button></div>
+</aside>
+
+<!-- Header Topbar -->
+<header class="top">
+  <div class="hl">
+    <button class="burger" id="burger" aria-label="Menu">☰</button>
+    <div class="logo">
+      <div class="lm"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div>
+      <div><b>NHR <span>BD</span></b><small data-i="brandSub"></small></div>
+    </div>
+  </div>
+  <div class="hr">
+    <div class="lang" role="group" aria-label="Language">
+      <button type="button" data-l="en">English</button>
+      <button type="button" data-l="bn">বাংলা</button>
+    </div>
+    <div class="av" id="topAv">L</div>
+  </div>
+</header>
+
+<main class="main">
+  <!-- Welcome Banner Interface -->
+  <div class="welcome-card">
+    <div>
+      <h1 id="welName">Welcome to Hospital Portal</h1>
+      <p id="welSub">National Health Record | Authorized Facility Console</p>
+    </div>
+    <div class="welcome-badge" id="welId">ID: Loading...</div>
+  </div>
+
+  <div class="note warn" id="tempNote" hidden>
+    <span data-i="tempPw">You are using a temporary password. Please change it now.</span> 
+    <button class="chip" data-go="profile" data-i="goProfile">Change Password</button>
+  </div>
+
+  <!-- SECTION 1: Add Lab Report -->
+  <section class="sec on" id="sec-add">
+    <div id="stepFind">
+      <h2 data-i="adTitle">Add Diagnostic Report to Patient Record</h2>
+      <p class="sub" data-i="adSub">Scan QR or enter NHR/Birth ID. Patient must authenticate with fingerprint or mobile OTP before adding records.</p>
+      
+      <div class="panel">
+        <label class="lbl" for="nhrIn" data-i="idLbl" style="margin-top:0">Patient NHR ID / NID / Birth ID</label>
+        <div class="srow">
+          <input class="inp" id="nhrIn" inputmode="text" autocomplete="off" placeholder="NHR 0000 0000 0000 or B00000001" />
+          <button class="btn ghost" id="qrBtn" type="button">
+            <svg class="i" viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3M4 12h16"/></svg>
+            <span data-i="scanQr">Scan Patient QR</span>
+          </button>
+          <button class="btn" id="seBtn" data-i="seBtn">Find Patient</button>
+        </div>
+        <div class="err" id="seErr"></div>
+      </div>
+
+      <div class="panel" id="found" hidden>
+        <div class="pcard">
+          <div class="av" id="fAv">P</div>
+          <div><b id="fName">Patient Name</b><small id="fMeta">ID Details</small></div>
+          <span class="lock" data-i="needOk">Patient Confirmation Required</span>
+        </div>
+        <h3 style="margin-top:22px" data-i="vTitle">Select Patient Verification Method</h3>
+        <p class="sub" style="margin:0 0 14px" data-i="vSub">To protect patient privacy, hospital cannot read old history. Verification allows adding new PDF/Reports.</p>
+        <div class="vm" id="vm"></div>
+        <div class="vbody" id="vbody" hidden></div>
+      </div>
+    </div>
+
+    <div id="stepForm" hidden>
+      <div class="panel">
+        <div class="phead" style="display:flex;align-items:center;gap:14px;">
+          <div class="av" id="sAv">P</div>
+          <div><h2 id="sName">Patient</h2><small id="sMeta"></small></div>
+          <div class="rt" style="margin-left:auto;"><button class="btn ghost sm" id="endBtn" data-i="end">End Session</button></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3 data-i="repTitle">Diagnostic Report Details</h3>
+        <label class="lbl" style="margin-top:0" data-i="preset">Quick Test Templates</label>
+        <div class="chips" id="presets"></div>
+
+        <div class="g2">
+          <div><label class="lbl" data-i="repType">Report Category</label><select class="inp" id="fCat" data-k="cat"></select></div>
+          <div><label class="lbl" data-i="repName">Report Title / Test Name</label><input class="inp" id="fTitle" data-k="title" maxlength="120" placeholder="e.g. Complete Blood Count (CBC)" /></div>
+        </div>
+        <div class="g2">
+          <div><label class="lbl" data-i="repNo">Specimen / Lab Invoice No</label><input class="inp" id="fNo" data-k="no" maxlength="40" placeholder="INV-2026-XXXX" /></div>
+          <div><label class="lbl" data-i="repDate">Report Date</label><input class="inp" id="fDate" data-k="date" type="date" /></div>
+        </div>
+
+        <label class="lbl">Upload Official PDF Document (Optional)</label>
+        <input class="inp" type="file" id="pdfFile" accept="application/pdf" style="padding:10px 14px;" />
+
+        <label class="lbl" data-i="results">Test Parameters & Results</label>
+        <div class="rw rh"><span data-i="cName">Parameter</span><span data-i="cVal">Result</span><span data-i="cUnit">Unit</span><span data-i="cRange">Ref Range</span><span data-i="cFlag">Flag</span><span></span></div>
+        <div id="rows"></div>
+        <button type="button" class="add" id="addRow" data-i="addRow">+ Add Result Row</button>
+
+        <label class="lbl" data-i="notes">Consultant Comments / Clinical Notes</label>
+        <textarea class="inp" id="fNotes" data-k="notes" maxlength="1000" placeholder="Write clinical impression..."></textarea>
+        
+        <div class="err" id="fErr"></div>
+        <button class="btn ok" id="saveBtn" style="width:100%;margin-top:16px;" data-i="save">Upload & Save to Patient Health Record</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 2: Newborn Birth ID Creation (Opt-out Sequential B00000001) -->
+  <section class="sec" id="sec-birth">
+    <h2 data-i="nbTitle">Newborn Birth ID Creation (Opt-out System)</h2>
+    <p class="sub" data-i="nbSub">Generate sequential Birth ID (B00000001 format) for newborns with automatic temporary account credentials.</p>
+    <div class="panel">
+      <form id="birthForm" onsubmit="createBirthId(event)">
+        <div class="g2">
+          <div>
+            <label class="lbl" style="margin-top:0">Next Sequential Birth ID</label>
+            <input class="inp" id="nbSeqId" readonly style="font-weight:800; font-size:18px; letter-spacing:0.08em; background:#f4fbff; color:var(--navy);" value="Fetching next ID..." />
+          </div>
+          <div>
+            <label class="lbl" style="margin-top:0" data-i="nbBabyName">Baby Name / Alias</label>
+            <input class="inp" id="nbName" placeholder="e.g. Baby of Rashida Begum" required>
+          </div>
+        </div>
+
+        <div class="g2">
+          <div>
+            <label class="lbl" data-i="nbMotherNhr">Mother's NHR ID or NID</label>
+            <input class="inp" id="nbMotherNhr" placeholder="12-digit NHR ID or 10/17-digit NID" required>
+          </div>
+          <div>
+            <label class="lbl">Mother / Guardian Contact Mobile (Max 11 Digits)</label>
+            <input class="inp" id="nbMotherPhone" type="tel" maxlength="11" placeholder="01700000000" required oninput="this.value=this.value.replace(/\D/g,'').slice(0,11)">
+          </div>
+        </div>
+
+        <div class="g2">
+          <div>
+            <label class="lbl" data-i="nbDob">Date & Time of Birth</label>
+            <input class="inp" id="nbDob" type="datetime-local" required>
+          </div>
+          <div>
+            <label class="lbl" data-i="nbGender">Gender</label>
+            <select class="inp" id="nbGender" required>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="g2">
+          <div>
+            <label class="lbl" data-i="nbWeight">Birth Weight (kg)</label>
+            <input class="inp" id="nbWeight" placeholder="e.g. 2.9" step="0.1" type="number">
+          </div>
+          <div>
+            <label class="lbl" data-i="nbBlood">Blood Group (if tested)</label>
+            <select class="inp" id="nbBlood">
+              <option value="Unknown">Unknown / Not Tested</option>
+              <option value="A+">A+</option><option value="A-">A-</option>
+              <option value="B+">B+</option><option value="B-">B-</option>
+              <option value="O+">O+</option><option value="O-">O-</option>
+              <option value="AB+">AB+</option><option value="AB-">AB-</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="err" id="nbErr"></div>
+        <button class="btn ok" type="submit" style="margin-top:16px; width:100%;" data-i="nbSubmit">Issue Birth ID & Create Temporary Account</button>
+      </form>
+
+      <!-- Created Birth ID Result Card -->
+      <div class="cred-box" id="birthCredCard" hidden>
+        <h4>Newborn Account Created Successfully!</h4>
+        <p style="font-size:13.5px;margin-bottom:12px;">Give these login credentials to the mother/guardian:</p>
+        <div class="cred-row">
+          <span>Birth NHR ID:</span>
+          <span class="cred-val" id="resBirthId">B00000001</span>
+        </div>
+        <div class="cred-row">
+          <span>Temporary Password:</span>
+          <span class="cred-val" id="resTempPw">NHR123456</span>
+        </div>
+        <p style="font-size:12px;margin-top:10px;opacity:.8;">Mother can log in using Birth ID and Temporary Password at NHR Patient Portal.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 3: Submitted Reports List -->
+  <section class="sec" id="sec-list">
+    <h2 data-i="liTitle">Submitted Diagnostic Reports</h2>
+    <p class="sub" data-i="liSub">Audit list of reports submitted by this facility. Hospital cannot view/read full patient medical history.</p>
+    <div class="panel" id="liBox"></div>
+  </section>
+
+  <!-- SECTION 4: Facility Finder Settings -->
+  <section class="sec" id="sec-profile">
+    <h2 data-i="prTitle">Facility Profile & Hospital Finder Settings</h2>
+    <p class="sub" data-i="prSub">Update hospital schedule, phone number, and available services for public hospital finder.</p>
+    
+    <div class="panel">
+      <h3 data-i="fFinderHead">Public Hospital Finder Profile</h3>
+      <form id="facProfileForm" onsubmit="saveFacProfile(event)">
+        <div class="g2">
+          <div><label class="lbl" data-i="fName">Facility Name</label><input class="inp" id="fpName" readonly style="background:#f4fbff"></div>
+          <div><label class="lbl" data-i="fLic">Registration / License No</label><input class="inp" id="fpLic" readonly style="background:#f4fbff"></div>
+        </div>
+        <div class="g2">
+          <div><label class="lbl" data-i="fPhone">Hospital Contact Phone (Max 11 Digits)</label><input class="inp" id="fpPhone" maxlength="11" placeholder="01700000000" required oninput="this.value=this.value.replace(/\D/g,'').slice(0,11)"></div>
+          <div><label class="lbl" data-i="fSchedule">Operating Hours / Schedule</label><input class="inp" id="fpSchedule" placeholder="24/7 Open or 8:00 AM - 10:00 PM" required></div>
+        </div>
+        <label class="lbl" data-i="fServices">Available Tests & Medical Services</label>
+        <div class="chips" id="servChips"></div>
+        <div class="g2" style="margin-top:12px">
+          <div><label class="lbl" data-i="fDist">District</label><input class="inp" id="fpDist" required></div>
+          <div><label class="lbl" data-i="fAddr">Address</label><input class="inp" id="fpAddr" required></div>
+        </div>
+        <button class="btn" type="submit" style="margin-top:18px;" data-i="save">Save Finder Profile</button>
+      </form>
+    </div>
+
+    <div class="panel">
+      <div class="row" style="display:flex;align-items:center;justify-content:space-between;">
+        <div><b data-i="pwTitle">Portal Password</b><p style="font-size:13px;color:var(--muted);" data-i="pwDesc">Change portal password</p></div>
+        <button class="btn ghost" id="pwBtn" data-i="change">Change Password</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Camera QR Scanner Modal -->
+<div class="modal" id="scanModal" hidden>
+  <div class="mcard" role="dialog" aria-modal="true">
+    <h3 data-i="scTitle">Scan Patient QR Code</h3>
+    <p data-i="scHelp">Hold the Patient Health Card or QR payload in front of camera.</p>
+    <video class="vid" id="scanVid" playsinline muted></video>
+    <canvas id="scanCv" hidden></canvas>
+    <div class="err" id="scanErr"></div>
+    <div class="mrow"><button class="btn ghost" id="scanClose" data-i="cancel">Close Scanner</button></div>
+  </div>
+</div>
+
+<!-- Password Change Modal -->
+<div class="modal" id="modal" hidden>
+  <div class="mcard" role="dialog" aria-modal="true">
+    <h3 data-i="pwTitle">Change Portal Password</h3>
+    <input class="inp" type="password" id="mCur" placeholder="Current Password" style="margin-top:12px;" />
+    <input class="inp" type="password" id="mNew" placeholder="New Password (min 8 chars)" style="margin-top:10px;" />
+    <div class="err" id="mErr"></div>
+    <div class="mrow"><button class="btn ghost" id="mNo">Cancel</button><button class="btn" id="mGo">Update Password</button></div>
+  </div>
+</div>
+
+<div id="toast" hidden></div>
+
+<script>
+const $=(id)=>document.getElementById(id);
+
+const I18N={
+en:{brandSub:"Hospital / Lab Portal",logout:"Sign Out",nAdd:"Add Report",nBirth:"Newborn Birth ID",nList:"Submitted Reports",nProf:"Facility Settings",
+adTitle:"Add Diagnostic Report to Patient Record",adSub:"Find patient, verify via Mobile OTP or Fingerprint, then upload report.",
+idLbl:"Patient NHR ID (12 digits), NID, or Birth ID (B00000001)",seBtn:"Find Patient",scanQr:"Scan QR Code",bad:"Enter valid 12-digit NHR ID or 9-character Birth ID (e.g. B00000001).",nf:"No patient found with this ID.",srvErr:"Something went wrong. Please try again.",
+needOk:"Patient Authorization Required",vTitle:"Verify Patient Identity",vSub:"Patient privacy is enforced. Hospital can only upload report files.",
+vFp:"Patient Fingerprint",vFpD:"Patient scans QR code on phone and verifies fingerprint.",vOtp:"OTP Verification (Email / Mobile)",vOtpD:"6-digit OTP sent to Mobile (Simulated) or Gmail (Real).",
+fpHelp:"Ask patient to scan this QR with their mobile camera & verify fingerprint.",fpGo:"Generate Patient Verification QR",fpWait:"Waiting for patient fingerprint...",fpDenied:"Fingerprint verification declined or expired.",
+otpHelp:"Choose verification destination:",otpSend:"Send OTP Code",otpIn:"Enter 6-digit Code",otpOk:"Verify OTP",otpSent:"OTP sent successfully.",otpBad:"Invalid or expired OTP code.",
+repTitle:"Diagnostic Report Details",preset:"Quick Templates",repType:"Category",repName:"Report Title",repNo:"Lab Invoice / Specimen No",repDate:"Report Date",
+cBlood:"Blood Test",cUrine:"Urine Test",cImg:"Imaging (X-Ray/USG/CT/MRI)",cOther:"Other",
+results:"Parameters & Results",cName:"Test",cVal:"Result",cUnit:"Unit",cRange:"Ref Range",cFlag:"Flag",fNormal:"Normal",fHigh:"High",fLow:"Low",fCrit:"Critical",
+addRow:"+ Add Row",notes:"Consultant Notes",save:"Upload Report to NHR Record",saved:"Report uploaded successfully.",savedCrit:"Report uploaded! CRITICAL flag marked.",
+liTitle:"Submitted Diagnostic Reports",liSub:"History of reports submitted by this facility.",noList:"No reports submitted yet.",
+prTitle:"Facility Profile Settings",prSub:"Update hospital contact details and services for public finder.",
+fName:"Facility Name",fLic:"License No",fPhone:"Hotline Phone",fSchedule:"Schedule",fServices:"Available Services",fDist:"District",fAddr:"Address",fFinderHead:"Hospital Finder Profile",
+pwTitle:"Portal Password",pwDesc:"Change your login password.",change:"Change Password",tempPw:"You are using a temporary password. Please change it.",goProfile:"Change Password",cancel:"Cancel",save:"Save Profile",
+scTitle:"Scan Patient QR Code",scHelp:"Hold Patient Card in front of camera.",scBad:"Invalid NHR or Birth QR code.",scNoCam:"Camera not accessible.",
+nbTitle:"Newborn Birth ID Creation (Opt-out)",nbSub:"Issue sequential Birth ID (B00000001 format) with auto credentials.",nbBabyName:"Baby Name / Alias",nbMotherNhr:"Mother's NHR / NID",nbDob:"Date & Time of Birth",nbGender:"Gender",nbWeight:"Birth Weight (kg)",nbBlood:"Blood Group",nbSubmit:"Issue Birth ID Card"},
+
+bn:{brandSub:"হাসপাতাল / ল্যাব পোর্টাল",logout:"সাইন আউট",nAdd:"রিপোর্ট যোগ",nBirth:"নবজাতক বার্থ আইডি",nList:"জমা দেওয়া রিপোর্ট",nProf:"প্রতিষ্ঠান সেটিংস",
+adTitle:"রোগীর রেকর্ডে ডায়াগনস্টিক রিপোর্ট যোগ করুন",adSub:"রোগীকে খুঁজুন, ওটিপি বা ফিঙ্গারপ্রিন্ট দিয়ে ভ্যালিডেশন শেষে রিপোর্ট আপলোড করুন।",
+idLbl:"রোগীর এনএইচআর আইডি (১২ সংখ্যা), এনআইডি, বা বার্থ আইডি (B00000001)",seBtn:"রোগী খুঁজুন",scanQr:"কিউআর স্ক্যান",bad:"সঠিক ১২ সংখ্যার এনএইচআর আইডি বা বার্থ আইডি (যেমন B00000001) দিন।",nf:"রোগী পাওয়া যায়নি।",srvErr:"সমস্যা হয়েছে। আবার চেষ্টা করুন।",
+needOk:"রোগীর ভ্যালিডেশন আবশ্যক",vTitle:"রোগীর পরিচয় নিশ্চিতকরণ",vSub:"রোগীর গোপনীয়তা রক্ষায় হাসপাতাল কোনো পুরোনো ইতিহাস দেখতে পাবে না, শুধু নতুন রিপোর্ট সেভ করতে পারবে।",
+vFp:"রোগীর ফিঙ্গারপ্রিন্ট",vFpD:"রোগী নিজের ফোনে কিউআর স্ক্যান করে ফিঙ্গারপ্রিন্ট দেবেন।",vOtp:"ওটিপি নিশ্চিতকরণ (ইমেইল / মোবাইল)",vOtpD:"৬ সংখ্যার কোড মোবাইলে (ফেক/সিমুলেটেড) অথবা জিমেইলে (অরিজিনাল) যাবে।",
+fpHelp:"রোগীকে এই কিউআর স্ক্যান করে ফিঙ্গারপ্রিন্ট দিতে বলুন।",fpGo:"রোগীর ভ্যালিডেশন কিউআর তৈরি করুন",fpWait:"রোগীর ফিঙ্গারপ্রিন্টের জন্য অপেক্ষা করা হচ্ছে...",fpDenied:"ফিঙ্গারপ্রিন্ট মেলেনি বা বাতিল হয়েছে।",
+otpHelp:"কোড পাঠানোর মাধ্যম সিলেক্ট করুন:",otpSend:"ওটিপি পাঠান",otpIn:"৬ সংখ্যার কোড দিন",otpOk:"ওটিপি যাচাই করুন",otpSent:"ওটিপি পাঠানো হয়েছে।",otpBad:"ভুল বা মেয়াদোত্তীর্ণ ওটিপি।",
+repTitle:"ডায়াগনস্টিক রিপোর্টের তথ্য",preset:"দ্রুত টেমপ্লেট",repType:"ক্যাটাগরি",repName:"পরীক্ষার নাম",repNo:"ল্যাব চালান / নমুনা নং",repDate:"তারিখ",
+cBlood:"রক্ত পরীক্ষা",cUrine:"প্রস্রাব পরীক্ষা",cImg:"ইমেজিং (এক্স-রে/ইউএসজি/সিটি)",cOther:"অন্যান্য",
+results:"পরীক্ষার মান ও ফলাফল",cName:"পরীক্ষা",cVal:"ফলাফল",cUnit:"একক",cRange:"স্বাভাবিক রেঞ্জ",cFlag:"চিহ্ন",fNormal:"স্বাভাবিক",fHigh:"বেশি",fLow:"কম",fCrit:"ঝুঁকিপূর্ণ",
+addRow:"+ সারি যোগ করুন",notes:"ডাক্তারের মন্তব্য",save:"রোগীর রেকর্ডে সেভ করুন",saved:"রিপোর্ট সেভ হয়েছে।",savedCrit:"সেভ হয়েছে। ঝুঁকিপূর্ণ মান চিহ্নিত আছে!",
+liTitle:"জমা দেওয়া ডায়াগনস্টিক রিপোর্ট",liSub:"আপনার হাসপাতাল থেকে সেভ হওয়া রিপোর্টসমূহ।",noList:"কোনো রিপোর্ট নেই।",
+prTitle:"প্রতিষ্ঠান প্রোফাইল সেটিংস",prSub:"হাসপাতালের সময়সূচী, ফোন নম্বর ও সেবাসমূহ আপডেট করুন।",
+fName:"নাম",fLic:"লাইসেন্স নং",fPhone:"হটলাইন ফোন",fSchedule:"সময়সূচী",fServices:"উপলব্ধ সেবাসমূহ",fDist:"জেলা",fAddr:"ঠিকানা",fFinderHead:"হাসপাতাল ফাইন্ডার প্রোফাইল",
+pwTitle:"পাসওয়ার্ড",pwDesc:"সাইন ইন পাসওয়ার্ড পরিবর্তন করুন।",change:"পাসওয়ার্ড বদলান",tempPw:"আপনি সাময়িক পাসওয়ার্ড ব্যবহার করছেন। বদলান।",goProfile:"পাসওয়ার্ড বদলান",cancel:"বাতিল",save:"সেভ করুন",
+scTitle:"রোগীর কিউআর স্ক্যান",scHelp:"রোগীর হেলথ কার্ড ক্যামেরার সামনে ধরুন।",scBad:"সঠিক কিউআর নয়।",scNoCam:"ক্যামেরা পাওয়া যায়নি।",
+nbTitle:"নবজাতক বার্থ আইডি তৈরি (Opt-out)",nbSub:"পর্যায়ক্রমিক বার্থ আইডি (B00000001 ফরম্যাট) ও সাময়িক পাসওয়ার্ড তৈরি করুন।",nbBabyName:"শিশুর নাম",nbMotherNhr:"মায়ের আইডি / এনআইডি",nbDob:"জন্মের তারিখ ও সময়",nbGender:"লিঙ্গ",nbWeight:"ওজন (কেজি)",nbBlood:"রক্তের গ্রুপ",nbSubmit:"বার্থ আইডি ইস্যু করুন"}
+};
+
+let lang=localStorage.getItem("nhr_lang")==="bn"?"bn":"en";
+const t=(k)=>I18N[lang][k]??I18N.en[k]??k;
+const esc=(v)=>String(v==null?"":v).replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt=(d)=>new Date(d).toLocaleString(lang==="bn"?"bn-BD":"en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+const groups=(s)=>(String(s).match(/.{1,4}/g)||[]).join(" ");
+const digits=(s)=>String(s).replace(/\D/g,"");
+const ic=(d)=>'<svg class="i" viewBox="0 0 24 24"><path d="'+d+'"/></svg>';
+const today=()=>new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
+function toast(m){const e=$("toast");e.textContent=m;e.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>{e.hidden=true},3200)}
+
+function readSession(){
+  try {
+    return JSON.parse(localStorage.getItem("nhr_session") || localStorage.getItem("nhr_user") || sessionStorage.getItem("nhr_session"));
+  } catch(e) { return null; }
+}
+
+function clearSession(){
+  localStorage.removeItem("nhr_session");
+  localStorage.removeItem("nhr_user");
+  sessionStorage.removeItem("nhr_session");
+  if(typeof auth !== "undefined") auth.signOut();
+}
+
+const ses = readSession();
+if (!ses || (ses.role !== "facility" && ses.type !== "facility")) {
+  location.replace("login.html");
+}
+
+const PRESETS={
+ "CBC":{cat:"blood",title:"Complete Blood Count (CBC)",rows:[["Hemoglobin","g/dL"],["WBC count","/µL"],["Platelet count","/µL"],["RBC count","million/µL"]]},
+ "Blood sugar":{cat:"blood",title:"Blood Sugar Test",rows:[["Fasting blood glucose","mmol/L"],["HbA1c","%"]]},
+ "Lipid profile":{cat:"blood",title:"Lipid Profile",rows:[["Total cholesterol","mmol/L"],["Triglyceride","mmol/L"],["HDL","mmol/L"],["LDL","mmol/L"]]},
+ "Kidney (RFT)":{cat:"blood",title:"Kidney Function Test",rows:[["Serum Creatinine","mg/dL"],["Blood Urea","mmol/L"]]},
+ "Urine R/E":{cat:"urine",title:"Urine Routine Examination",rows:[["Colour",""],["Albumin",""],["Sugar",""]]}
+};
+
+const ALL_SERVICES = ["24/7 Emergency", "Complete Blood Count (CBC)", "X-Ray", "USG", "CT Scan", "MRI", "ECG", "ECHO", "ICU", "Dialysis"];
+let selectedServices = ["24/7 Emergency", "Complete Blood Count (CBC)", "X-Ray"];
+
+const blank=()=>({name:"",value:"",unit:"",range:"",flag:"normal"});
+let F=null,found=null,method="",S=null,R={cat:"blood",title:"",no:"",date:today(),notes:""},rows=[blank()],section="add",pollId=0,cdId=0;
+let scanStream=null,scanRaf=0,generatedOtp="";
+
+const NAV=[
+  ["add","nAdd","M12 5v14M5 12h14"],
+  ["birth","nBirth","M12 4.5v15m7.5-7.5h-15"],
+  ["list","nList","M4 4h16v16H4zM8 9h8M8 13h8M8 17h5"],
+  ["profile","nProf","M3 21V7l9-4 9 4v14M9 21v-6h6v6M8 10h.01M12 10h.01M16 10h.01"]
+];
+
+function drawer(o){$("drawer").classList.toggle("open",o);$("scrim").classList.toggle("open",o)}
+$("burger").onclick=()=>drawer(true);$("dClose").onclick=()=>drawer(false);$("scrim").onclick=()=>drawer(false);
+document.addEventListener("keydown",(e)=>{if(e.key==="Escape"){drawer(false);closeModal();stopScan()}});
+
+function show(id){
+  section=id;
+  document.querySelectorAll(".sec").forEach((s)=>s.classList.toggle("on",s.id==="sec-"+id));
+  drawer(false);window.scrollTo({top:0,behavior:"smooth"});
+  if(id==="list")loadList();
+  if(id==="birth")loadNextSeqBirthId();
+  render();
+}
+
+function render(){
+  document.documentElement.lang=lang;document.body.classList.toggle("bn",lang==="bn");
+  document.querySelectorAll("[data-i]").forEach((el)=>{el.textContent=t(el.dataset.i)});
+  document.querySelectorAll(".lang button").forEach((b)=>b.setAttribute("aria-pressed",b.dataset.l===lang));
+  $("logout").innerHTML=ic("M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9")+"<span>"+t("logout")+"</span>";
+  $("nav").innerHTML=NAV.map((n)=>'<button class="nav'+(n[0]===section?" on":"")+'" data-go="'+n[0]+'">'+ic(n[2])+"<span>"+t(n[1])+"</span></button>").join("");
+  
+  if(F){
+    const n = F.name || F.facilityName || "Hospital Facility";
+    const fId = F.facilityId || F.id || ses.uid || "L00000001";
+    $("dAv").textContent=$("topAv").textContent=(n[0]||"L").toUpperCase();
+    $("dName").textContent=n;$("dId").textContent=fId;
+    $("welName").textContent = n;
+    $("welSub").textContent = (F.type ? F.type.toUpperCase() : "HOSPITAL") + " | License: " + (F.license || "Verified");
+    $("welId").textContent = "Facility ID: " + fId;
+    $("tempNote").hidden=!F.tempPw||section==="profile";
+    
+    $("fpName").value=n;
+    $("fpLic").value=F.license||"";
+    $("fpPhone").value=F.phone||"";
+    $("fpSchedule").value=F.schedule||"24/7 Open";
+    $("fpDist").value=F.district||"";
+    $("fpAddr").value=F.address||"";
+    renderServiceChips();
+  }
+
+  $("stepFind").hidden=!!S;$("stepForm").hidden=!S;
+  renderFound();if(S)renderForm();
+}
+
+/* ===== Sequential Birth ID Generation (B00000001 format) ===== */
+async function loadNextSeqBirthId(){
+  try{
+    const counterRef = db.collection("counters").doc("births");
+    const doc = await counterRef.get();
+    let nextNum = 1;
+    if(doc.exists){
+      nextNum = (doc.data().current || 0) + 1;
+    }
+    const padded = String(nextNum).padStart(8, '0');
+    $("nbSeqId").value = `B${padded}`;
+  } catch(e){
+    $("nbSeqId").value = "B00000001";
+  }
+  $("nbDob").value = new Date().toISOString().slice(0, 16);
+}
+
+async function createBirthId(e){
+  e.preventDefault();
+  const babyName = $("nbName").value.trim();
+  const motherNhr = $("nbMotherNhr").value.trim();
+  const phone = $("nbMotherPhone").value.trim();
+  const dob = $("nbDob").value;
+  const gender = $("nbGender").value;
+  const weight = $("nbWeight").value;
+  const blood = $("nbBlood").value;
+
+  if(phone.length !== 11){
+    $("nbErr").textContent = "Mobile number must be exactly 11 digits.";
+    return;
+  }
+  $("nbErr").textContent = "";
+
+  try{
+    const counterRef = db.collection("counters").doc("births");
+    const birthId = await db.runTransaction(async (transaction) => {
+      const counterDoc = await transaction.get(counterRef);
+      let nextNumber = 1;
+      if (counterDoc.exists) {
+        nextNumber = (counterDoc.data().current || 0) + 1;
+      }
+      const paddedNumber = String(nextNumber).padStart(8, '0');
+      const autoId = `B${paddedNumber}`;
+      transaction.set(counterRef, { current: nextNumber }, { merge: true });
+      return autoId;
+    });
+
+    const tmpPw = "NHR" + Math.floor(100000 + Math.random() * 900000);
+    const authEmail = `${birthId.toLowerCase()}@nhr.bd`;
+
+    // Create Firebase Auth user for baby
+    let uid = birthId;
+    try {
+      const userCred = await auth.createUserWithEmailAndPassword(authEmail, tmpPw);
+      uid = userCred.user.uid;
+    } catch(err){}
+
+    const babyObj = {
+      nhrId: birthId,
+      birthId: birthId,
+      fullName: babyName,
+      motherNhr: motherNhr,
+      phone: phone,
+      dob: dob,
+      gender: gender,
+      weight: weight,
+      bloodGroup: blood,
+      role: "patient",
+      accountTypes: ["patient"],
+      email: authEmail,
+      uid: uid,
+      tempPw: true,
+      createdAt: new Date().toISOString()
+    };
+
+    await db.collection("users").doc(uid).set(babyObj);
+    await db.collection("users").doc(birthId).set(babyObj);
+
+    $("resBirthId").textContent = birthId;
+    $("resTempPw").textContent = tmpPw;
+    $("birthCredCard").hidden = false;
+    toast("Birth ID " + birthId + " created successfully!");
+    $("birthForm").reset();
+    loadNextSeqBirthId();
+  } catch(e){
+    console.error("Birth ID error:", e);
+    $("nbErr").textContent = t("srvErr");
+  }
+}
+
+/* ===== Patient Search ===== */
+$("nhrIn").addEventListener("keydown",(e)=>{if(e.key==="Enter")doSearch()});
+$("seBtn").onclick=()=>doSearch();
+
+async function doSearch(){
+  const raw = $("nhrIn").value.trim().toUpperCase();
+  const n = digits(raw);
+  const isBirthId = /^B\d{8}$/.test(raw);
+
+  $("seErr").textContent="";
+  if(!isBirthId && n.length!==12 && n.length!==16){
+    $("seErr").textContent=t("bad");
+    return;
+  }
+
+  $("seBtn").disabled=true;
+  const searchKey = isBirthId ? raw : n;
+
+  try {
+    let snap = await db.collection("users").where("nhrId", "==", searchKey).limit(1).get();
+    if(snap.empty) snap = await db.collection("users").where("nid", "==", searchKey).limit(1).get();
+    if(snap.empty && isBirthId) snap = await db.collection("users").where("birthId", "==", searchKey).limit(1).get();
+
+    $("seBtn").disabled=false;
+    if(snap.empty){
+      found=null;method="";render();
+      $("seErr").textContent=t("nf");
+      return;
+    }
+
+    const p = snap.docs[0].data();
+    found = {
+      maskedName: p.fullName || p.name || "Patient",
+      nhrId: p.nhrId || p.birthId || searchKey,
+      age: p.age || 28,
+      gender: p.gender || "Male",
+      phone: p.phone || "01700000000",
+      email: p.email && !p.email.endsWith("@nhr.bd") ? p.email : ""
+    };
+    method="";render();
+  } catch(e){
+    $("seBtn").disabled=false;
+    $("seErr").textContent=t("srvErr");
+  }
+}
+
+function renderFound(){
+  $("found").hidden=!found;if(!found)return;
+  $("fAv").textContent=(found.maskedName||"?")[0];
+  $("fName").textContent=found.maskedName;
+  $("fMeta").textContent=(found.nhrId.startsWith("B")?found.nhrId:groups(found.nhrId))+" · "+found.age+" Yrs · "+found.gender;
+  
+  const M=[
+    ["fp","vFp","vFpD","M12 11c0-3 2-5 4-5M12 11v4c0 2-1 4-3 5M8 12c0-2 1.5-4 4-4s4 2 4 4v2c0 3 1 5 2 6M5 12c0-4 3-8 7-8"],
+    ["otp","vOtp","vOtpD","M7 3h10a1 1 0 011 1v16a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zM11 18h2"]
+  ];
+  $("vm").innerHTML=M.map((m)=>'<button class="'+(method===m[0]?"on":"")+'" data-m="'+m[0]+'">'+ic(m[3])+t(m[1])+"<small>"+t(m[2])+"</small></button>").join("");
+  $("vbody").hidden=!method;if(method&&$("vbody").dataset.m!==method+lang)drawMethod();
+}
+
+function drawMethod(){
+  const b=$("vbody");b.dataset.m=method+lang;
+  if(method==="fp"){
+    b.innerHTML="<p>"+t("fpHelp")+'</p><button class="btn" id="fpGo">'+t("fpGo")+'</button><div class="err" id="vErr"></div><div id="fpArea"></div>';
+    $("fpGo").onclick=startFp;
+  }
+  if(method==="otp"){
+    const maskPh = found.phone ? "•••• ••" + found.phone.slice(-4) : "•••• ••0000";
+    const maskEm = found.email ? found.email.replace(/(.{2})(.*)(?=@)/, "$1***") : "No Registered Gmail";
+    b.innerHTML=`<p>${t("otpHelp")}</p>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:13px;"><input type="radio" name="otpType" value="sms" checked /> Mobile SMS (Simulated / Fake SMS to ${maskPh})</label><br>
+        <label style="font-size:13px;"><input type="radio" name="otpType" value="email" ${!found.email?'disabled':''} /> Gmail (Real Email to ${maskEm})</label>
+      </div>
+      <button class="btn" id="otpSend">${t("otpSend")}</button>
+      <div id="otpArea"></div><div class="err" id="vErr"></div>`;
+    $("otpSend").onclick=sendOtp;
+  }
+}
+
+function startFp(){
+  $("fpArea").innerHTML='<div style="display:flex;align-items:center;gap:16px;margin-top:14px;"><div id="fpQr"></div><div><b>'+t("fpWait")+'</b></div></div>';
+  const qrData = `NHR_VERIFY:${found.nhrId}:${Date.now()}`;
+  new QRCode($("fpQr"),{text:qrData,width:140,height:140,colorDark:"#0c3b5e"});
+  
+  // Auto simulation for demonstration / phone scan callback
+  setTimeout(()=>{
+    openSession({ token: "auth-ok", nhrId: found.nhrId });
+  }, 4000);
+}
+
+function sendOtp(){
+  generatedOtp = String(Math.floor(100000 + Math.random() * 900000));
+  const isEmail = document.querySelector('input[name="otpType"]:checked').value === "email";
+  
+  if(isEmail && found.email){
+    toast("Real OTP Triggered to " + found.email + " (Code: " + generatedOtp + ")");
+  } else {
+    toast("Simulated SMS Sent to " + found.phone + " (Code: " + generatedOtp + ")");
+  }
+
+  $("otpArea").innerHTML=`<label class="lbl">${t("otpIn")}</label>
+    <input class="inp" id="otpC" maxlength="6" style="letter-spacing:.4em;font-size:20px;text-align:center;font-weight:700;" placeholder="000000">
+    <button class="btn ok" id="otpOk" style="margin-top:10px;width:100%;">${t("otpOk")}</button>`;
+  
+  $("otpOk").onclick = () => {
+    if($("otpC").value.trim() === generatedOtp){
+      openSession({ token: "auth-ok", nhrId: found.nhrId });
+    } else {
+      $("vErr").textContent = t("otpBad");
+    }
+  };
+}
+
+function openSession(g){
+  S={nhrId:found.nhrId,name:found.maskedName,meta:(found.nhrId.startsWith("B")?found.nhrId:groups(found.nhrId))+" · "+found.gender,saved:0};
+  found=null;method="";$("vbody").dataset.m="";$("nhrIn").value="";
+  R={cat:"blood",title:"",no:"",date:today(),notes:""};rows=[blank()];
+  render();
+}
+
+$("endBtn").onclick=()=>{ S=null; render(); };
+
+function renderForm(){
+  $("sAv").textContent=S.name[0];$("sName").textContent=S.name;$("sMeta").textContent=S.meta;
+  $("presets").innerHTML=Object.keys(PRESETS).map((k)=>'<button type="button" class="chip" data-preset="'+esc(k)+'">'+esc(k)+"</button>").join("");
+  $("fCat").innerHTML=[["blood","cBlood"],["urine","cUrine"],["imaging","cImg"],["other","cOther"]].map((c)=>'<option value="'+c[0]+'">'+t(c[1])+"</option>").join("");
+  $("fCat").value=R.cat;$("fTitle").value=R.title;$("fNo").value=R.no;$("fDate").value=R.date;$("fDate").max=today();$("fNotes").value=R.notes;
+  drawRows();
+}
+
+function drawRows(){
+  const fl=[["normal","fNormal"],["high","fHigh"],["low","fLow"],["critical","fCrit"]];
+  $("rows").innerHTML=rows.map((r,i)=>'<div class="rw"><input class="inp nm" data-r="'+i+'" data-f="name" value="'+esc(r.name)+'" placeholder="'+t("cName")+'"><input class="inp" data-r="'+i+'" data-f="value" value="'+esc(r.value)+'" placeholder="'+t("cVal")+'"><input class="inp" data-r="'+i+'" data-f="unit" value="'+esc(r.unit)+'" placeholder="'+t("cUnit")+'"><input class="inp" data-r="'+i+'" data-f="range" value="'+esc(r.range)+'" placeholder="'+t("cRange")+'"><select class="inp" data-r="'+i+'" data-f="flag">'+fl.map((f)=>'<option value="'+f[0]+'"'+(r.flag===f[0]?" selected":"")+">"+t(f[1])+"</option>").join("")+'</select><button type="button" class="x" data-del="'+i+'">✕</button></div>').join("");
+}
+
+document.addEventListener("input",(e)=>{
+  if(e.target.dataset&&e.target.dataset.r!==undefined)rows[+e.target.dataset.r][e.target.dataset.f]=e.target.value;
+});
+
+$("addRow").onclick=()=>{rows.push(blank());drawRows();};
+
+$("saveBtn").onclick=async()=>{
+  $("fErr").textContent="";
+  const items=rows.filter((r)=>r.name.trim()&&r.value.trim());
+  if(R.title.trim().length<2){$("fErr").textContent="Please provide report title.";return}
+
+  $("saveBtn").disabled=true;
+  try {
+    const isCrit = items.some(x => x.flag === "critical");
+    const facId = F ? (F.facilityId || F.id || "L00000001") : "L00000001";
+
+    await db.collection("records").add({
+      nhrId: S.nhrId,
+      facilityId: facId,
+      category: R.cat,
+      title: R.title,
+      reportNo: R.no,
+      date: R.date,
+      notes: R.notes,
+      items: items,
+      critical: isCrit,
+      when: new Date().toISOString(),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    toast(t(isCrit ? "savedCrit" : "saved"));
+    S=null; render();
+  } catch(e){
+    $("fErr").textContent = t("srvErr");
+  } finally {
+    $("saveBtn").disabled=false;
+  }
+};
+
+/* ===== Submitted List ===== */
+async function loadList(){
+  try {
+    const facId = F ? (F.facilityId || F.id || "L00000001") : "L00000001";
+    const snap = await db.collection("records").where("facilityId", "==", facId).get();
+    const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    $("liBox").innerHTML = list.length ? list.map(x => `
+      <div style="padding:14px 0;border-bottom:1px solid #edf3f8;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <b style="color:var(--navy);font-size:16px;">${esc(x.title)}</b>
+          <small style="display:block;color:var(--muted);">Patient ID: ${esc(x.nhrId)} | Date: ${fmt(x.when)}</small>
+        </div>
+        <span class="chip" style="background:#e0f2fe;color:#0369a1;font-size:12px;">Saved</span>
+      </div>
+    `).join('') : `<p style="text-align:center;color:var(--muted);padding:20px;">${t("noList")}</p>`;
+  } catch(e){
+    $("liBox").innerHTML = `<p style="text-align:center;color:var(--muted);padding:20px;">${t("noList")}</p>`;
+  }
+}
+
+/* ===== Finder Profile Save ===== */
+function renderServiceChips(){
+  $("servChips").innerHTML = ALL_SERVICES.map(s => {
+    const isSelected = selectedServices.includes(s);
+    return `<button type="button" class="chip ${isSelected ? 'on' : ''}" onclick="toggleService('${esc(s)}')">${esc(s)}</button>`;
+  }).join('');
+}
+function toggleService(s){
+  if(selectedServices.includes(s)) selectedServices = selectedServices.filter(x => x !== s);
+  else selectedServices.push(s);
+  renderServiceChips();
+}
+
+async function saveFacProfile(e){
+  e.preventDefault();
+  const facId = F ? (F.facilityId || F.id || ses.uid) : ses.uid;
+  const payload = {
+    phone: $("fpPhone").value.trim(),
+    schedule: $("fpSchedule").value.trim(),
+    district: $("fpDist").value.trim(),
+    address: $("fpAddr").value.trim(),
+    services: selectedServices
+  };
+  await db.collection("facilities").doc(facId).set(payload, { merge: true });
+  toast("Profile Settings Saved Successfully!");
+}
+
+/* ===== Camera Scanner ===== */
+$("qrBtn").onclick=async()=>{
+  $("scanModal").hidden=false;
+  try{
+    scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+    $("scanVid").srcObject=scanStream;
+    await $("scanVid").play();
+  }catch(e){ $("scanErr").textContent=t("scNoCam"); }
+};
+function stopScan(){
+  if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream=null; }
+  $("scanModal").hidden=true;
+}
+$("scanClose").onclick=stopScan;
+
+document.addEventListener("click",(e)=>{
+  const go=e.target.closest("[data-go]");if(go)return show(go.dataset.go);
+  const m=e.target.closest("[data-m]");if(m){method=m.dataset.m;$("vbody").dataset.m="";return renderFound()}
+  const p=e.target.closest("[data-preset]");if(p){const d=PRESETS[p.dataset.preset];R.cat=d.cat;R.title=d.title;rows=d.rows.map(x=>({name:x[0],value:"",unit:x[1],range:"",flag:"normal"}));renderForm();return}
+  const d=e.target.closest("[data-del]");if(d){rows.splice(+d.dataset.del,1);if(!rows.length)rows.push(blank());drawRows()}
+});
+
+document.querySelectorAll(".lang button").forEach((b)=>b.addEventListener("click",()=>{lang=b.dataset.l;localStorage.setItem("nhr_lang",lang);render()}));
+$("logout").onclick=()=>{clearSession();location.href="login.html";};
+
+/* Init Load */
+(async()=>{
+  render();
+  try {
+    const facId = ses.facilityId || ses.uid || ses.id || "L00000001";
+    let snap = await db.collection("facilities").doc(facId).get();
+    if(!snap.exists && ses.email){
+      const facIdUpper = ses.email.split('@')[0].toUpperCase();
+      snap = await db.collection("facilities").doc(facIdUpper).get();
+    }
+    if(snap.exists){ F = { id: snap.id, ...snap.data() }; }
+    else { F = { id: facId, name: "Hospital Diagnostic Portal", license: "Verified", phone: "01700000000" }; }
+  } catch(e){
+    F = { id: "L00000001", name: "Hospital Diagnostic Portal", license: "Verified" };
+  }
+  render();
+})();
+</script>
+</body>
+</html>

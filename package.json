@@ -1,0 +1,13 @@
+{
+  "name": "nhr-bd",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.10",
+    "express": "^4.22.3",
+    "nodemailer": "^10.4.0"
+  }
+}
