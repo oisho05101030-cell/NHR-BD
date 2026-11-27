@@ -61,6 +61,10 @@ h1{font-size:26px;font-weight:800;color:#0c3b5e}
   }
 </style>
 <script src="nhr-config.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
 </head>
 <body>
 <header class="top">
@@ -79,68 +83,87 @@ h1{font-size:26px;font-weight:800;color:#0c3b5e}
 <script>
 const $=(id)=>document.getElementById(id);
 const GROUPS=["A+","A-","B+","B-","AB+","AB-","O+","O-"];
-const I18N={en:{head:"Blood stock",title:"Hospital blood stock",sub:"Update how many blood bags each hospital has. Patients see these numbers on their dashboard.",save:"Save",saved:"Saved.",upd:"Updated {d}",never:"Not updated yet",out:"Sign out",err:"Something went wrong.",none:"No hospital or clinic to show yet. An admin has to register one first."},
-bn:{head:"রক্তের মজুত",title:"হাসপাতালের রক্তের মজুত",sub:"প্রতিটি হাসপাতালে কয়টি রক্তের ব্যাগ আছে হালনাগাদ করুন। রোগীরা ড্যাশবোর্ডে এই সংখ্যা দেখবেন।",save:"সেভ",saved:"সেভ হয়েছে।",upd:"হালনাগাদ {d}",never:"এখনও হালনাগাদ হয়নি",out:"সাইন আউট",err:"কিছু একটা সমস্যা হয়েছে।",none:"দেখানোর মতো হাসপাতাল বা ক্লিনিক এখনও নেই। আগে অ্যাডমিনকে একটি নিবন্ধন করতে হবে।"}};
+const I18N={
+  en:{head:"Blood stock",title:"Hospital blood stock",sub:"Update how many blood bags each hospital has. Patients see these numbers live on their dashboard.",save:"Save",saved:"Saved live to Firestore.",upd:"Updated {d}",never:"Not updated yet",out:"Sign out",err:"Something went wrong.",none:"No hospital or clinic registered yet. An admin has to register one first."},
+  bn:{head:"রক্তের মজুত",title:"হাসপাতালের রক্তের মজুত",sub:"প্রতিটি হাসপাতালে কয়টি রক্তের ব্যাগ আছে হালনাগাদ করুন। রোগীরা ড্যাশবোর্ডে এই সংখ্যা লাইভ দেখবেন।",save:"সেভ",saved:"লাইভ সেভ হয়েছে।",upd:"হালনাগাদ {d}",never:"এখনও হালনাগাদ হয়নি",out:"সাইন আউট",err:"কিছু একটা সমস্যা হয়েছে।",none:"দেখানোর মতো কোনো হাসপাতাল বা ক্লিনিক এখনও নিবন্ধিত হয়নি।"}
+};
 let lang=localStorage.getItem("nhr_lang")==="bn"?"bn":"en";
-
-const DEMO_MODE = true;
-let H = [
-  { id: "FAC1", name: "Square Hospital", district: "Dhaka", type: "Hospital", updatedAt: new Date().toISOString(), units: {"A+":12,"A-":4,"B+":10,"B-":2,"AB+":5,"AB-":1,"O+":15,"O-":3} },
-  { id: "FAC2", name: "Labaid Diagnostic", district: "Dhaka", type: "Clinic", updatedAt: new Date().toISOString(), units: {"A+":5,"A-":0,"B+":8,"B-":1,"AB+":2,"AB-":0,"O+":9,"O-":1} }
-];
+let H=[];
 
 const t=(k)=>I18N[lang][k]||k;
 const esc=(v)=>String(v==null?"":v).replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-
-const read=()=>{
-  try{return JSON.parse(sessionStorage.getItem("nhr_session")||localStorage.getItem("nhr_session"))}
-  catch(e){return { token: "demo", type: "admin", nhrId: "ADM0001" }}
-};
-const ses=read() || { token: "demo", type: "admin", nhrId: "ADM0001" };
+const read=()=>{for(const st of [sessionStorage,localStorage]){try{const v=JSON.parse(st.getItem("nhr_session")||st.getItem("nhr_user")||"null");if(v)return v}catch(e){}}return null};
+const ses=read();
+if(!ses){location.replace("login.html")}
 
 const toast=(m)=>{const e=$("toast");e.textContent=m;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>{e.hidden=true},2500)};
-
-async function api(url,body){
-  try{const r=await fetch(url,{method:body?"POST":"GET",headers:{"Content-Type":"application/json",Authorization:"Bearer "+ses.token},body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,data:await r.json().catch(()=>({}))}}
-  catch(e){return{ok:false,status:0,data:{}}}
-}
-
-const ago=(iso)=>{const m=Math.floor((Date.now()-new Date(iso))/60000);return m<1?"just now":m<60?m+" min":m<1440?Math.floor(m/60)+" h":Math.floor(m/1440)+" d"};
+const ago=(iso)=>{const m=Math.floor((Date.now()-new Date(iso))/60000);return Number.isNaN(m)||m<1?(lang==="bn"?"এইমাত্র":"just now"):m<60?m+" min":m<1440?Math.floor(m/60)+" h":Math.floor(m/1440)+" d"};
 
 function render(){
   document.body.classList.toggle("bn",lang==="bn");document.documentElement.lang=lang;
   document.querySelectorAll("[data-i]").forEach((e)=>{e.textContent=t(e.dataset.i)});
   document.querySelectorAll(".lang button").forEach((b)=>b.setAttribute("aria-pressed",b.dataset.l===lang));
   $("out").textContent=t("out");
-  
-  const mine=ses.type==="facility"?H.filter((h)=>h.id===ses.nhrId):H;
-  $("list").innerHTML=mine.length?mine.map((h)=>'<div class="card"><h3>'+esc(h.name)+"</h3><small>"+esc(h.district)+" · "+esc(h.type)+" · "+(h.updatedAt?t("upd").replace("{d}",ago(h.updatedAt)):t("never"))+'</small><div class="grid">'+GROUPS.map((g)=>'<div><label>'+g+'</label><input type="number" min="0" max="999" data-h="'+esc(h.id)+'" data-g="'+g+'" value="'+((h.units&&h.units[g])||0)+'"></div>').join("")+'</div><button class="save" data-save="'+esc(h.id)+'">'+t("save")+"</button></div>").join(""):'<p class="empty">'+t("none")+"</p>";
+  const mine=(ses&&(ses.type==="facility"||ses.role==="facility")&&ses.nhrId)?H.filter((h)=>h.id===ses.nhrId||h.facilityId===ses.nhrId):H;
+  $("list").innerHTML=mine.length?mine.map((h)=>'<div class="card"><h3>'+esc(h.name)+"</h3><small>"+esc(h.district||"")+" · "+esc(h.type||"Hospital")+" · "+(h.updatedAt?t("upd").replace("{d}",ago(h.updatedAt)):t("never"))+'</small><div class="grid">'+GROUPS.map((g)=>'<div><label>'+g+'</label><input type="number" min="0" max="999" data-h="'+esc(h.id)+'" data-g="'+g+'" value="'+((h.units&&h.units[g])||0)+'"></div>').join("")+'</div><button class="save" data-save="'+esc(h.id)+'">'+t("save")+"</button></div>").join(""):'<p class="empty">'+t("none")+"</p>";
 }
 
 document.addEventListener("click",async(e)=>{
   const b=e.target.closest("[data-save]");if(!b)return;
   const id=b.dataset.save,units={};
-  document.querySelectorAll('input[data-h="'+id+'"]').forEach((i)=>{units[i.dataset.g]=parseInt(i.value,10)||0});
-  
-  if(DEMO_MODE){
-    const target = H.find(h=>h.id===id);
-    if(target) { target.units = units; target.updatedAt = new Date().toISOString(); }
-    toast(t("saved")); render(); return;
+  document.querySelectorAll('input[data-h="'+id+'"]').forEach((i)=>{units[i.dataset.g]=Math.max(0,parseInt(i.value,10)||0)});
+  b.disabled=true;
+  try{
+    const target=H.find(h=>h.id===id)||{id};
+    const updatedAt=new Date().toISOString();
+    if(window.db){
+      await window.db.collection("hospitals").doc(id).set({
+        id,
+        name:target.name||id,
+        district:target.district||"",
+        type:target.type||"Hospital",
+        phone:target.phone||"",
+        units,
+        updatedAt
+      },{merge:true});
+    }
+    if(ses&&ses.token){
+      const url=(ses.type==="admin"||ses.role==="admin")?"/api/admin/blood-stock":"/api/facility/blood-stock";
+      fetch(url,{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+ses.token},body:JSON.stringify({facilityId:id,units})}).catch(()=>{});
+    }
+    toast(t("saved"));
+  }catch(err){
+    toast(t("err"));
+  }finally{
+    b.disabled=false;
   }
-  
-  const r=ses.type==="admin"?await api("/api/admin/blood-stock",{facilityId:id,units}):await api("/api/facility/blood-stock",{units});
-  if(r.ok){toast(t("saved"));await load()}else toast(t("err"));
 });
 
 document.querySelectorAll(".lang button").forEach((b)=>b.addEventListener("click",()=>{lang=b.dataset.l;localStorage.setItem("nhr_lang",lang);render()}));
-$("out").onclick=()=>{localStorage.removeItem("nhr_session");sessionStorage.removeItem("nhr_session");location.href="login.html"};
+$("out").onclick=()=>{try{if(window.auth)auth.signOut()}catch(e){}localStorage.removeItem("nhr_session");sessionStorage.removeItem("nhr_session");localStorage.removeItem("nhr_user");location.href="login.html"};
 
-async function load(){
-  if(DEMO_MODE){ render(); return; }
-  const r=await api("/api/hospitals");if(r.status===401){location.replace("login.html");return}if(r.ok)H=r.data.list;render()
+function startLiveStock(){
+  render();
+  if(!window.db)return;
+  const hospMap=new Map();
+  const sync=()=>{H=[...hospMap.values()];render()};
+  window.db.collection("hospitals").onSnapshot(snap=>{
+    hospMap.clear();
+    snap.docs.forEach(d=>hospMap.set(d.id,{...d.data(),id:d.id}));
+    sync();
+  });
+  window.db.collection("facilities").onSnapshot(snap=>{
+    snap.docs.forEach(d=>{
+      const f=d.data();
+      const fid=f.facilityId||d.id;
+      if(!hospMap.has(fid)){
+        hospMap.set(fid,{id:fid,name:f.name||fid,district:f.district||"",type:f.type||"Hospital",phone:f.phone||"",units:f.units||{},updatedAt:f.updatedAt||""});
+      }
+    });
+    sync();
+  });
 }
-
-render();load();
+startLiveStock();
 </script>
 </body>
 </html>

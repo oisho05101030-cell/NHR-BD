@@ -319,7 +319,7 @@ textarea.inp{height:auto;padding:12px 14px;min-height:92px;resize:vertical}
 
   <!-- Appointments -->
   <section class="sec" id="sec-appointments">
-    <h2><span data-i="nAppointments"></span><span class="sample" id="apSample" data-i="sample"></span></h2><p class="sub" data-i="apSub"></p>
+    <h2><span data-i="nAppointments"></span></h2><p class="sub" data-i="apSub"></p>
     <div class="panel"><h3 data-i="apToday"></h3><div id="apList"></div></div>
   </section>
 
@@ -398,11 +398,9 @@ textarea.inp{height:auto;padding:12px 14px;min-height:92px;resize:vertical}
 const $=(id)=>document.getElementById(id);
 const params=new URLSearchParams(location.search);
 const LOCAL_HOST=location.protocol==="file:"||["localhost","127.0.0.1","[::1]"].includes(location.hostname);
-let DEMO=false; 
-
 const I18N={
 en:{brandSub:"Doctor portal",logout:"Sign out",nOverview:"Overview",nSearch:"Find patient",nAppointments:"Appointments",nAudit:"My access log",nProfile:"My profile",nSettings:"Settings & privacy",nSwitch:"My own health record",
-notifTitle:"Notifications",markRead:"Mark all read",noNotif:"You are all caught up.",demoBar:"Demo mode: no server was found, so sample data is shown. OTP is 123456.",sample:"Sample data",
+notifTitle:"Notifications",markRead:"Mark all read",noNotif:"You are all caught up.",
 ovTitle:"Welcome,",ovSub:"Your practice at a glance.",stAppts:"Today's appointments",stOpened:"Patients opened",stLog:"Access log entries",stStatus:"Account status",stApproved:"Approved",
 qSearch:"Find patient",qSearchD:"Search and open a record",qAppts:"Appointments",qApptsD:"Today's queue",qProf:"My profile",qProfD:"Degrees, fee and chamber time",recent:"Recently searched",noRecent:"No recent searches.",open:"Search",
 seTitle:"Find a patient",seSub:"Type the NHR ID or NID, or scan the QR on the patient's card. Emergency details and blood group are shown immediately.",nhrLbl:"Patient NHR ID (12 digits) or NID (16 digits)",seBtn:"Search",scanQr:"Scan QR",
@@ -433,11 +431,11 @@ deInfo1:"You are signed out and cannot open any patient record.",deInfo2:"Patien
 d0:"Only when I sign in again",d1:"Automatically after 1 day",d3:"Automatically after 3 days",d7:"Automatically after 7 days",d14:"Automatically after 14 days",d30:"Automatically after 30 days",
 r1:"This is temporary, I will be back",r2:"I am on leave or travelling",r3:"I have a privacy concern",r4:"I get too many notifications",r5:"I moved to another hospital",r6:"Other",rOther:"Tell us more (optional)",deDone:"Account deactivated.",
 sampleBp:"BP",nowTxt:"just now",show:"Show",hide:"Hide",offTitle:"Offline emergency QR",offWarn:"Read straight from the QR and not verified. Open the record with the patient's confirmation for full details.",offName:"Name",
-recOpened:"Record opened: ",recAdded:"Record added for ",sampleNotif:"Sample: a new appointment was booked.",docFallback:"Doctor",
+recOpened:"Record opened: ",recAdded:"Record added for ",docFallback:"Doctor",
 otpPreview:"Message the patient will receive:",reqBanner:"{doc}{hosp} is requesting access to your NHR Health Record. Please provide the OTP to grant access.",otpSentMsg:"OTP has been sent to the patient's Phone & Gmail. Enter the OTP to authorize access for {doc}:",otpTo:"The code goes to the phone ending {p} and {e}.",
 apNone:"No appointments today.",srvDown:"Cannot reach the server. Please try again in a moment."},
 bn:{brandSub:"ডাক্তার পোর্টাল",logout:"সাইন আউট",nOverview:"ওভারভিউ",nSearch:"রোগী খুঁজুন",nAppointments:"অ্যাপয়েন্টমেন্ট",nAudit:"আমার অ্যাক্সেস লগ",nProfile:"আমার প্রোফাইল",nSettings:"সেটিংস ও গোপনীয়তা",nSwitch:"আমার নিজের স্বাস্থ্য রেকর্ড",
-notifTitle:"নোটিফিকেশন",markRead:"সব পঠিত",noNotif:"নতুন কিছু নেই।",demoBar:"ডেমো মোড: সার্ভার পাওয়া যায়নি, তাই নমুনা তথ্য দেখানো হচ্ছে। ওটিপি 123456।",sample:"নমুনা তথ্য",
+notifTitle:"নোটিফিকেশন",markRead:"সব পঠিত",noNotif:"নতুন কিছু নেই।",
 ovTitle:"স্বাগতম,",ovSub:"আপনার চেম্বারের এক নজর।",stAppts:"আজকের অ্যাপয়েন্টমেন্ট",stOpened:"খোলা রোগী",stLog:"অ্যাক্সেস লগ",stStatus:"অ্যাকাউন্টের অবস্থা",stApproved:"অনুমোদিত",
 qSearch:"রোগী খুঁজুন",qSearchD:"খুঁজে রেকর্ড খুলুন",qAppts:"অ্যাপয়েন্টমেন্ট",qApptsD:"আজকের সারি",qProf:"আমার প্রোফাইল",qProfD:"ডিগ্রি, ফি ও চেম্বারের সময়",recent:"সাম্প্রতিক খোঁজ",noRecent:"সাম্প্রতিক কোনো খোঁজ নেই।",open:"খুঁজুন",
 seTitle:"রোগী খুঁজুন",seSub:"এনএইচআর আইডি বা এনআইডি লিখুন, অথবা রোগীর কার্ডের কিউআর স্ক্যান করুন। জরুরি পরিচিতি ও রক্তের গ্রুপ সাথে সাথে দেখা যাবে।",nhrLbl:"রোগীর এনএইচআর আইডি (১২ সংখ্যা) বা এনআইডি (১৬ সংখ্যা)",seBtn:"খুঁজুন",scanQr:"কিউআর স্ক্যান",
@@ -467,7 +465,7 @@ deInfo1:"আপনি সাইন আউট হবেন এবং কোনো
 d0:"শুধু আমি সাইন ইন করলে",d1:"১ দিন পর নিজে থেকে",d3:"৩ দিন পর নিজে থেকে",d7:"৭ দিন পর নিজে থেকে",d14:"১৪ দিন পর নিজে থেকে",d30:"৩০ দিন পর নিজে থেকে",
 r1:"এটি সাময়িক, আমি ফিরে আসব",r2:"আমি ছুটিতে বা ভ্রমণে আছি",r3:"আমার গোপনীয়তা নিয়ে চিন্তা আছে",r4:"অনেক বেশি নোটিফিকেশন আসে",r5:"অন্য হাসপাতালে চলে গেছি",r6:"অন্য কারণ",rOther:"আরও বলুন (ঐচ্ছিক)",deDone:"অ্যাকাউন্ট নিষ্ক্রিয় হয়েছে।",
 sampleBp:"রক্তচাপ",nowTxt:"এইমাত্র",show:"দেখান",hide:"লুকান",offTitle:"অফলাইন জরুরি কিউআর",offWarn:"কিউআর থেকে সরাসরি পড়া, যাচাই করা নয়। পূর্ণ তথ্যের জন্য রোগীর নিশ্চিতকরণে রেকর্ড খুলুন।",offName:"নাম",
-recOpened:"রেকর্ড খোলা হয়েছে: ",recAdded:"রেকর্ড যোগ হয়েছে: ",sampleNotif:"নমুনা: নতুন অ্যাপয়েন্টমেন্ট বুক হয়েছে।",docFallback:"চিকিৎসক",
+recOpened:"রেকর্ড খোলা হয়েছে: ",recAdded:"রেকর্ড যোগ হয়েছে: ",docFallback:"চিকিৎসক",
 otpPreview:"রোগী যে বার্তা পাবেন:",reqBanner:"{doc}{hosp} আপনার এনএইচআর স্বাস্থ্য রেকর্ডে প্রবেশ করতে চাচ্ছেন। ফাইল খোলার অনুমতি দিতে ওটিপি কোডটি প্রদান করুন।",otpSentMsg:"ওটিপি কোডটি রোগীর মোবাইলে ও জিমেইলে পাঠানো হয়েছে। {doc}-কে অনুমতি দিতে নিচে ওটিপিটি প্রবেশ করান:",otpTo:"কোড যাবে ফোনে (শেষ দুই সংখ্যা {p}) ও {e} ঠিকানায়।",
 apNone:"আজ কোনো অ্যাপয়েন্টমেন্ট নেই।",srvDown:"সার্ভারে পৌঁছানো যাচ্ছে না। একটু পরে আবার চেষ্টা করুন।"}
 };
@@ -508,7 +506,7 @@ function readDocSession() {
 
 auth.onAuthStateChanged(async (user) => {
   const fpSes = readDocSession();
-  if (!user && !fpSes && !DEMO) {
+  if (!user && !fpSes) {
     location.replace("login.html");
     return;
   }
@@ -539,8 +537,7 @@ auth.onAuthStateChanged(async (user) => {
         hasFingerprint: !!uData.hasFingerprint
       };
       render();
-      loadAudit();
-      loadAppts();
+      startDocLiveSync();
     } else if (fpSes) {
       D = Object.assign(D, { uid: activeUid, name: fpSes.name || "Dr. User", bmdc: fpSes.bmdc || "DOC0001", hasFingerprint: true });
       render();
@@ -776,8 +773,7 @@ async function _apiInner(url, body, method, access) {
 let D_data=null,found=null,S=null,method="",tab="sum",filter="all",section="overview",tickId=0,pollId=0,cdId=0,vChart=null,AUD=[],scanStream=null,scanRaf=0,lastAct=Date.now(),mockFp=0;
 let RX={type:"rx",title:"",notes:"",detail:"",meds:[{name:"",dose:"",freq:"",duration:""}],override:""};
 let NOTIFS=[];
-const DEMO_APPTS=[{serial:"01",name:"Rahim Uddin",time:"10:00 AM",status:"pending"},{serial:"02",name:"Nusrat Jahan",time:"10:30 AM",status:"pending"},{serial:"03",name:"Kamal Hossain",time:"11:00 AM",status:"done"}];
-let APPTS=DEMO_APPTS.map((a)=>({...a}));
+let APPTS=[];
 const NAV=[["overview","nOverview","M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10"],["search","nSearch","M11 4a7 7 0 100 14 7 7 0 000-14zM21 21l-5-5"],["appointments","nAppointments","M8 7V3m8 4V3M3 11h18M5 5h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z"],["audit","nAudit","M4 4h16v16H4zM8 9h8M8 13h8M8 17h5"],["profile","nProfile","M12 12a4 4 0 100-8 4 4 0 000 8zM4 21c0-4 4-6 8-6s8 2 8 6"],["settings","nSettings","M12 8a4 4 0 100 8 4 4 0 000-8zM12 2v3M12 19v3M2 12h3M19 12h3"]];
 function getRecent(){try{return JSON.parse(sessionStorage.getItem("nhr_doc_recent")||"[]")}catch(e){return[]}}
 function addRecent(p){const r=getRecent().filter((x)=>x.nhrId!==p.nhrId);r.unshift({nhrId:p.nhrId,maskedName:p.maskedName});try{sessionStorage.setItem("nhr_doc_recent",JSON.stringify(r.slice(0,5)))}catch(e){}}
@@ -809,7 +805,7 @@ function render(){
   document.documentElement.lang=lang;document.body.classList.toggle("bn",lang==="bn");document.title=t("brandSub")+" | NHR BD";
   document.querySelectorAll("[data-i]").forEach((el)=>{el.textContent=t(el.dataset.i)});
   document.querySelectorAll(".lang button").forEach((b)=>b.setAttribute("aria-pressed",b.dataset.l===lang));
-  $("demoBar").hidden=!DEMO;$("demoBar").textContent=t("demoBar");$("apSample").hidden=!DEMO;{const eb=$("errBar");if(!eb.hidden)eb.textContent=t(eb.dataset.k)}
+  {const eb=$("errBar");if(!eb.hidden)eb.textContent=t(eb.dataset.k)}
   $("logout").innerHTML=ic("M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9")+"<span>"+t("logout")+"</span>";
   $("nav").innerHTML=NAV.map((n)=>'<button class="nav'+((n[0]===section||(n[0]==="search"&&section==="patient"))?" on":"")+'" data-go="'+n[0]+'">'+ic(n[2])+"<span>"+t(n[1])+"</span>"+(n[0]==="search"&&S?'<i class="dot"></i>':"")+"</button>").join("")+'<button class="nav" data-switch="1">'+ic("M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3")+"<span>"+t("nSwitch")+"</span></button>";
   if(D){
@@ -1107,13 +1103,53 @@ async function saveRecord(){
 function renderAppts(){
   $("apList").innerHTML=APPTS.length?APPTS.map((a,i)=>'<div class="row"><div class="grow"><b>#'+esc(a.serial)+" · "+esc(a.name)+"</b><small>"+esc(a.time)+"</small></div>"+(a.status==="pending"?'<button class="btn sm" data-done="'+i+'">'+t("markDone")+"</button>":'<span class="state">'+t("done")+"</span>")+"</div>").join(""):'<p class="empty">'+t("apNone")+"</p>";
 }
-async function loadAppts(){
-  const r=await api("/api/doctor/appointments");
-  APPTS=r.ok&&Array.isArray(r.data.list)?r.data.list:[];render();
+let DOC_UNSUBS=[];
+function startDocLiveSync(){
+  DOC_UNSUBS.forEach(fn=>{try{fn()}catch(e){}});
+  DOC_UNSUBS=[];
+  if(!window.db||!D)return;
+  const bmdc=String(D.bmdc||"").trim();
+  const docName=String(D.name||"").trim();
+  const docUid=String(D.uid||"").trim();
+
+  DOC_UNSUBS.push(db.collection("appointments").onSnapshot(snap=>{
+    APPTS=snap.docs
+      .map(d=>({...d.data(),id:d.id}))
+      .filter(a=>a.status!=="cancelled"&&((bmdc&&(a.doctorId===bmdc||a.license===bmdc))||(docName&&a.doctor===docName)))
+      .map(a=>({
+        id:a.id,
+        serial:String(a.serial||"01").padStart(2,"0"),
+        name:a.patient||a.patientName||"Patient",
+        date:a.date||"",
+        time:fmtTime(a.time),
+        status:a.status==="done"?"done":"pending"
+      }));
+    render();
+  }));
+
+  if(bmdc){
+    DOC_UNSUBS.push(db.collection("audit_logs").where("doctorId","==",bmdc).onSnapshot(snap=>{
+      AUD=snap.docs.map(d=>d.data()).sort((a,b)=>Number(b.at||b.when||0)-Number(a.at||a.when||0));
+      render();
+    }));
+  }
+
+  const notifTarget=docUid||bmdc;
+  if(notifTarget){
+    DOC_UNSUBS.push(db.collection("notifications").where("userId","==",notifTarget).onSnapshot(snap=>{
+      NOTIFS=snap.docs.map(d=>({k:L(d.data().text)||"",a:"",at:d.data().at||Date.now(),un:!d.data().read}));
+      renderNotifs();
+    }));
+  }
 }
+async function loadAppts(){}
 async function markDone(i){
   const a=APPTS[i];if(!a)return;
-  a.status="done";renderAppts();toast(t("apDone"));
+  a.status="done";renderAppts();
+  if(a.id&&window.db){
+    try{await db.collection("appointments").doc(a.id).update({status:"done",completedAt:new Date().toISOString()})}catch(e){}
+  }
+  toast(t("apDone"));
 }
 
 /* ===== Access log ===== */
@@ -1128,10 +1164,16 @@ $("pfSave").onclick=async()=>{
   $("pfErr").textContent="";
   const b={speciality:$("pfSpec").value.trim(),hospital:$("pfHosp").value.trim(),degree:$("pfDegree").value.trim(),fee:$("pfFee").value.trim(),schedule:$("pfSchedule").value.trim()};
   if(b.speciality.length<2||b.hospital.length<2){$("pfErr").textContent=t("pfBad");return}
-  $("pfSave").disabled=true;const r=await api("/api/doctor/profile",b);$("pfSave").disabled=false;
-  if(!r.ok){$("pfErr").textContent=t("srvErr");return}
-  Object.assign(D,{specialty:b.speciality,hospital:b.hospital,degree:b.degree,fee:b.fee,schedule:b.schedule});$("pfSpec").dataset.init="";
-  toast(t("saved"));show("overview");
+  $("pfSave").disabled=true;
+  try{
+    if(window.db){
+      if(D.uid) await db.collection("users").doc(D.uid).set({specialty:b.speciality,hospital:b.hospital,degree:b.degree,fee:b.fee,schedule:b.schedule},{merge:true});
+      if(D.bmdc) await db.collection("doctors").doc(D.bmdc).set({id:D.bmdc,name:D.name,speciality:b.speciality,hospital:b.hospital,chamber:b.hospital,degree:b.degree,fee:String(b.fee).replace(/\D/g,"")||b.fee,schedule:b.schedule},{merge:true});
+    }
+    api("/api/doctor/profile",b).catch(()=>{});
+    Object.assign(D,{specialty:b.speciality,hospital:b.hospital,degree:b.degree,fee:b.fee,schedule:b.schedule});$("pfSpec").dataset.init="";
+    toast(t("saved"));show("overview");
+  }catch(e){$("pfErr").textContent=t("srvErr")}finally{$("pfSave").disabled=false}
 };
 
 /* ===== Settings ===== */

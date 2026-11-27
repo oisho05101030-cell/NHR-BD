@@ -125,8 +125,16 @@ h2{font-size:24px;font-weight:800;letter-spacing:-.02em;color:var(--navy)}.sub{m
 .et{display:flex;justify-content:space-between;align-items:center;gap:14px}.et h4{font-size:20px;color:var(--navy)}.et small{font-family:ui-monospace,Consolas,monospace;color:var(--muted)}
 .eb dt{font-size:12px;font-weight:700;color:var(--muted)}.eb dd{font-size:15px;font-weight:600;color:var(--navy)}
 .big{font-size:30px;font-weight:800;color:#d92d3a;text-align:center;padding:8px 14px;border-radius:14px;background:#fff1f2}.big small{display:block;font-size:11px;font-weight:600;color:var(--muted)}
-.row{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid #edf3f8}.row:last-child{border-bottom:none}
-.grow{flex:1;min-width:0}.row .grow b{display:block;color:var(--navy);font-size:15px}.row .grow small{color:var(--muted);font-size:13px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 0;border-bottom:1px solid #edf3f8}.row:last-child{border-bottom:none}
+.grow{flex:1 1 auto;min-width:0}.row .grow b{display:block;color:var(--navy);font-size:15px;line-height:1.35}.row .grow small{display:block;color:var(--muted);font-size:13px;line-height:1.45;margin-top:2px}
+.donate-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:none}
+@media(max-width:768px){
+  .donate-row{flex-direction:column!important;align-items:stretch!important;gap:10px!important}
+  .donate-row .grow{width:100%!important;flex:none!important}
+  .donate-controls{width:100%!important;display:flex!important;gap:8px!important}
+  .donate-controls input[type="date"]{flex:1 1 150px!important;min-width:0!important;width:auto!important}
+  .donate-controls .btn{flex:0 0 auto!important;white-space:nowrap!important}
+}
 .state{font-size:12.5px;font-weight:800;padding:4px 11px;border-radius:999px;display:inline-block}.state.yes{background:#e3f7ee;color:var(--ok)}.state.no{background:#fdecee;color:var(--err)}
 .sw{position:relative;width:48px;height:28px;border-radius:999px;border:none;background:#cbd8e4;cursor:pointer;transition:background .25s;flex:none}
 .sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.25);transition:transform .25s}.sw.on{background:#0a86cc}.sw.on::after{transform:translateX(20px)}.sw:disabled{opacity:.45;cursor:not-allowed}
@@ -325,7 +333,7 @@ gMorning:"Good morning",gAfternoon:"Good afternoon",gEvening:"Good evening",ovSu
 hidTitle:"National Health Record",hidBd:"Bangladesh",patient:"Patient",child:"Child",lblName:"Name",lblBlood:"Blood",lblDob:"Date of birth",copy:"Copy NHR ID",copied:"Copied",copyFailed:"Could not copy. Please select and copy your NHR ID.",
 emTitle:"Emergency contact",call:"Call now",noEm:"No emergency contact added.",edit:"Edit",emName:"Contact name",emRel:"Relationship",emPhone:"Phone number",emNeed:"Enter the contact's name and a valid mobile number.",
 stBlood:"Blood group",stAge:"Age",stAllergy:"Allergies",stVaccine:"Vaccines",yrs:"years",qTl:"Medical timeline",qCd:"Emergency card",qDoc:"Book Doctor",qHosp:"Hospitals",qBlood:"Blood donors",
-vitalsTitle:"📈 Vitals trend",sampleTag:"SAMPLE DATA",vBp:"Blood pressure (systolic)",vGlu:"Blood glucose (mmol/L)",vHba:"HbA1c (%)",chartErr:"Chart library could not load.",
+vitalsTitle:"📈 Vitals trend",sampleTag:"",vBp:"Blood pressure (systolic)",vGlu:"Blood glucose (mmol/L)",vHba:"HbA1c (%)",chartErr:"Chart library could not load.",
 recent:"Recent activity",viewAll:"View all",tlTitle:"Medical timeline",tlSub:"Prescriptions, lab reports, vaccinations and visits in one place, newest first.",search:"Search your records",
 fAll:"All",fRx:"Prescriptions",fLab:"Lab reports",fVac:"Vaccines",fVisit:"Visits",tRx:"Prescription",tLab:"Lab report",tVac:"Vaccine",tVisit:"Visit",tlEmpty:"No records yet. They appear here when a doctor or lab adds them.",
 vcTitle:"Vaccination record",vcSub:"Vaccines you have received.",vDone:"Received",vcEmpty:"No vaccines recorded yet.",
@@ -369,7 +377,7 @@ gMorning:"শুভ সকাল",gAfternoon:"শুভ অপরাহ্ন",g
 hidTitle:"জাতীয় স্বাস্থ্য রেকর্ড",hidBd:"বাংলাদেশ",patient:"রোগী",child:"শিশু",lblName:"নাম",lblBlood:"রক্ত",lblDob:"জন্ম তারিখ",copy:"এনএইচআর আইডি কপি",copied:"কপি হয়েছে",copyFailed:"কপি করা যায়নি। NHR ID নির্বাচন করে কপি করুন।",
 emTitle:"জরুরি যোগাযোগ",call:"এখনই ফোন করুন",noEm:"কোনো জরুরি যোগাযোগ যোগ করা হয়নি।",edit:"পরিবর্তন",emName:"যোগাযোগের নাম",emRel:"সম্পর্ক",emPhone:"মোবাইল নম্বর",emNeed:"যোগাযোগকারীর নাম ও সঠিক মোবাইল নম্বর দিন।",
 stBlood:"রক্তের গ্রুপ",stAge:"বয়স",stAllergy:"অ্যালার্জি",stVaccine:"টিকা",yrs:"বছর",qTl:"চিকিৎসা ইতিহাস",qCd:"জরুরি কার্ড",qDoc:"ডাক্তার বুকিং",qHosp:"হাসপাতাল",qBlood:"রক্তদাতা",
-vitalsTitle:"📈 ভাইটাল ট্রেন্ড",sampleTag:"নমুনা তথ্য",vBp:"রক্তচাপ (সিস্টোলিক)",vGlu:"রক্তের গ্লুকোজ (মিমোল/লি)",vHba:"এইচবিএ১সি (%)",chartErr:"চার্ট লাইব্রেরি লোড হয়নি।",
+vitalsTitle:"📈 ভাইটাল ট্রেন্ড",sampleTag:"",vBp:"রক্তচাপ (সিস্টোলিক)",vGlu:"রক্তের গ্লুকোজ (মিমোল/লি)",vHba:"এইচবিএ১সি (%)",chartErr:"চার্ট লাইব্রেরি লোড হয়নি।",
 recent:"সাম্প্রতিক কার্যক্রম",viewAll:"সব দেখুন",tlTitle:"চিকিৎসা ইতিহাস",tlSub:"প্রেসক্রিপশন, ল্যাব রিপোর্ট, টিকা ও ভিজিট এক জায়গায়, নতুনটি আগে।",search:"রেকর্ড খুঁজুন",
 fAll:"সব",fRx:"প্রেসক্রিপশন",fLab:"ল্যাব রিপোর্ট",fVac:"টিকা",fVisit:"ভিজিট",tRx:"প্রেসক্রিপশন",tLab:"ল্যাব রিপোর্ট",tVac:"টিকা",tVisit:"ভিজিট",tlEmpty:"এখনও কোনো রেকর্ড নেই। ডাক্তার বা ল্যাব যোগ করলে এখানে দেখা যাবে।",
 vcTitle:"টিকার রেকর্ড",vcSub:"আপনি যে টিকা নিয়েছেন।",vDone:"নেওয়া হয়েছে",vcEmpty:"এখনও কোনো টিকার রেকর্ড নেই।",
@@ -775,105 +783,166 @@ function renderDonor(){
     h+='<div class="row"><div class="grow"><b>'+t("dpAvail")+"</b><small>"+t("dpAvailD")+'</small></div><button class="sw'+(DONOR.available!==false?" on":"")+'" data-dp="available"></button></div>';
     h+='<div class="row"><div class="grow"><b>📞 '+t("dpShow")+"</b><small>"+t("dpShowD")+'</small></div><button class="sw'+(DONOR.showPhone!==false?" on":"")+'" data-dp="showPhone"></button></div>';
     h+='<div class="row"><div class="grow"><b>✉️ '+t("dpShowEmail")+"</b><small>"+(hasMail?esc(P.email)+" · "+t("dpShowEmailD"):t("dpNoEmail"))+'</small></div><button class="sw'+(DONOR.showEmail===true&&hasMail?" on":"")+'" data-dp="showEmail"'+(hasMail?"":" disabled")+"></button></div>";
-    h+='<div class="row"><div class="grow"><b>'+t("dpDonate")+"</b><small>"+t("dpDonateD")+'</small></div><input type="date" id="dpDate" class="inp" style="width:auto" max="'+todayStr()+'"><button class="btn btn-sm" data-dpdonate="1">'+t("dpRecord")+"</button></div>";
+    h+='<div class="row donate-row"><div class="grow"><b>'+t("dpDonate")+"</b><small>"+t("dpDonateD")+'</small></div><div class="donate-controls"><input type="date" id="dpDate" class="inp" max="'+todayStr()+'"><button class="btn btn-sm" data-dpdonate="1">'+t("dpRecord")+"</button></div></div>";
   }
   box.innerHTML=h;fixSwitches();
 }
+
+let ALL_DONORS = [];
 
 async function loadDonor(){
   const uid = (P && (P.uid || P.nhrId || P.nid)) || (auth.currentUser && auth.currentUser.uid);
   if(!uid) return;
   try {
     const doc = await db.collection("donors").doc(uid).get();
-    if(doc.exists){ 
-      DONOR = doc.data(); 
-      DONOR_NEXT = DONOR.lastDonation ? addDays(DONOR.lastDonation, 90) : null; 
+    if(doc.exists){
+      DONOR = doc.data();
+      DONOR_NEXT = DONOR.lastDonation ? addDays(DONOR.lastDonation, 90) : null;
+      if (DONOR_NEXT && DONOR_NEXT <= todayStr()) DONOR_NEXT = null;
     } else {
       DONOR = null;
       DONOR_NEXT = null;
     }
-    renderDonor(); 
-    renderReqs(); 
-  } catch(e){
-    console.error("Donor fetch error:", e);
-  }
+    renderDonor();
+    renderReqs();
+  } catch(e){ console.error("Donor fetch error:", e); }
 }
+
 async function loadReqs(){
   try {
     const snap = await db.collection("blood_requests").get();
-    REQS = snap.docs.map(d => ({ 
-      ...d.data(), 
-      id: d.id, 
-      mine: d.data().userId === (P && (P.nhrId || P.nid)) 
-    })); 
+    const myId = P && (P.nhrId || P.nid || P.uid);
+    REQS = snap.docs
+      .map(d => ({ ...d.data(), id: d.id, mine: d.data().userId === myId, responded: Array.isArray(d.data().responders) && d.data().responders.some(r => r.uid === myId || r.userId === myId) }))
+      .filter(r => r.status !== "closed")
+      .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
     renderReqs();
-  } catch(e){
-    console.error("Requests fetch error:", e);
-  }
+  } catch(e){ console.error("Requests fetch error:", e); }
 }
+
 async function loadAudit(){
   if(!P) return;
   try {
     const snap = await db.collection("audit_logs").where("patientId", "==", P.nhrId || P.nid).get();
-    if(!snap.empty){ DON_AUDIT = snap.docs.map(d=>d.data()); render(); return; }
+    DON_AUDIT = snap.docs.map(d=>d.data());
+    render();
   } catch(e){}
-  const r=await api("/api/patient/audit");if(r.ok){DON_AUDIT=Array.isArray(r.data.list)?r.data.list:[];render()}
 }
 
 async function loadRecords(){
   if(!P) return;
+  const key = P.nhrId || P.nid;
+  if(!key) return;
   try {
-    const snap = await db.collection("records").where("nhrId", "==", P.nhrId || P.nid).get();
-    if(!snap.empty){ REC.records = snap.docs.map(d=>d.data()); }
-    const vSnap = await db.collection("vitals").doc(P.nhrId || P.nid).get();
-    if(vSnap.exists){ VITALS = vSnap.data(); }
-    const aSnap = await db.collection("allergies").where("nhrId", "==", P.nhrId || P.nid).get();
-    if(!aSnap.empty){ REC.allergies = aSnap.docs.map(d=>d.data()); }
-    const cSnap = await db.collection("conditions").where("nhrId", "==", P.nhrId || P.nid).get();
-    if(!cSnap.empty){ REC.conditions = cSnap.docs.map(d=>d.data().name); }
-    render(); return;
-  } catch(e){}
-  const r=await api("/api/patient/records");
-  if(r.ok){REC={records:Array.isArray(r.data.records)?r.data.records:[],allergies:Array.isArray(r.data.allergies)?r.data.allergies:[],conditions:Array.isArray(r.data.conditions)?r.data.conditions:[]};ACC_AUDIT=Array.isArray(r.data.audit)?r.data.audit:[]}
-  render();
+    const [snap, vSnap, aSnap, cSnap] = await Promise.all([
+      db.collection("records").where("nhrId", "==", key).get(),
+      db.collection("vitals").doc(key).get(),
+      db.collection("allergies").where("nhrId", "==", key).get(),
+      db.collection("conditions").where("nhrId", "==", key).get()
+    ]);
+    REC.records = snap.docs.map(d=>d.data());
+    VITALS = vSnap.exists ? vSnap.data() : { dates: [], bp: [], glucose: [], hba1c: [] };
+    REC.allergies = aSnap.docs.map(d=>d.data());
+    REC.conditions = cSnap.docs.map(d=>d.data().name);
+    render();
+    initVitalsChart();
+  } catch(e){ console.error("Records load error:", e); }
 }
 
 const contactHtml=(d)=>(d.phone?'<a class="call" href="tel:'+esc(d.phone)+'">📞 '+esc(d.phone)+"</a>":"")+(d.email?'<a class="call" href="mailto:'+esc(d.email)+'">✉️ '+esc(d.email)+"</a>":"");
 
+function runDonorFilter(g, d) {
+  const myId = P && (P.uid || P.nhrId || P.nid);
+  bdGroup = g;
+  bdList = ALL_DONORS
+    .filter(u => u.active !== false && u.uid !== myId && CAN[g].includes(u.group || u.bloodGroup) && (!d || u.district === d))
+    .map(u => {
+      const nextDate = u.lastDonation ? addDays(u.lastDonation, 90) : null;
+      const isReady = u.available !== false && (!nextDate || nextDate <= todayStr());
+      return { ...u, ref: u.uid || u.id, available: isReady, nextDate: isReady ? null : nextDate, exact: (u.group || u.bloodGroup) === g };
+    })
+    .sort((a, b) => (b.exact - a.exact) || (Number(b.available) - Number(a.available)));
+  renderBdResults();
+}
+
 $("bdSearch").onclick=async()=>{
   const g=$("bdGroup").value;if(!g)return toast(t("selGroup"));
   const d=$("bdDistrict").value;
+  if (ALL_DONORS.length) {
+    runDonorFilter(g, d);
+    return;
+  }
   try {
     const snap = await db.collection("donors").where("active", "==", true).get();
-    if(!snap.empty){
-      const all = snap.docs.map(doc => doc.data());
-      bdGroup=g;
-      bdList = all.filter(u => CAN[g].includes(u.group||u.bloodGroup) && (!d || u.district === d)).map(u => ({...u, exact: (u.group||u.bloodGroup) === g})).sort((a,b) => (b.exact-a.exact));
-      renderBdResults(); return;
-    }
-  } catch(e){}
-  const r=await api("/api/donor/search?group="+encodeURIComponent(g)+"&district="+encodeURIComponent(d));
-  if(!r.ok)return toast(errText(r.data.error));
-  bdGroup=g;bdList=Array.isArray(r.data.list)?r.data.list:[];renderBdResults();
+    ALL_DONORS = snap.docs.map(doc => ({ ...doc.data(), uid: doc.id }));
+    runDonorFilter(g, d);
+  } catch(e){ toast(t("serverErr")); }
 };
 
 $("rqPost").onclick=async()=>{
   const g=$("rqGroup").value,d=$("rqDistrict").value;if(!g||!d)return toast(t("rqNeed"));
   const reqObj = {
-    userId: P.nhrId || P.nid, name: P.fullName, phone: P.phone || "", group: g, district: d,
-    hospital: $("rqHosp").value.trim(), note: $("rqNote").value.trim(), urgency: $("rqUrg").value,
-    units: +$("rqUnits").value || 1, createdAt: new Date().toISOString()
+    userId: P.nhrId || P.nid || P.uid,
+    requesterUid: P.uid || P.nhrId || P.nid,
+    name: P.fullName,
+    phone: P.phone || "",
+    group: g,
+    district: d,
+    hospital: $("rqHosp").value.trim(),
+    note: $("rqNote").value.trim(),
+    urgency: $("rqUrg").value,
+    units: +$("rqUnits").value || 1,
+    responders: [],
+    status: "open",
+    createdAt: new Date().toISOString()
   };
-  try { await db.collection("blood_requests").add(reqObj); } catch(e){}
-  const r=await api("/api/blood/requests",{group:g,district:d,hospital:$("rqHosp").value,note:$("rqNote").value,urgency:$("rqUrg").value,units:+$("rqUnits").value||1});
-  toast(t("rqPosted").replace("{n}",Number(r.data?.notified)||0));$("rqNote").value="";$("rqHosp").value="";await loadReqs();
+  try {
+    await db.collection("blood_requests").add(reqObj);
+    const matching = ALL_DONORS.filter(u => u.active !== false && u.uid !== (P.uid || P.nhrId || P.nid) && CAN[g].includes(u.group || u.bloodGroup) && (!d || u.district === d));
+    for (const m of matching.slice(0, 25)) {
+      if (m.uid) {
+        db.collection("notifications").add({
+          userId: m.uid,
+          type: reqObj.urgency === "urgent" ? "warn" : "info",
+          kind: "blood",
+          text: {
+            en: (P.fullName || "A patient") + " urgently needs " + g + " blood in " + d + ".",
+            bn: (P.fullName || "একজন রোগীর") + " " + distName(d) + "-এ জরুরি " + g + " রক্তের প্রয়োজন।"
+          },
+          at: new Date().toISOString(),
+          read: false
+        }).catch(()=>{});
+      }
+    }
+    toast(t("rqPosted").replace("{n}", matching.length));
+    $("rqNote").value="";$("rqHosp").value="";
+  } catch(e){ toast(t("serverErr")); }
 };
 
 async function toggleDonor(on){
-  const donorObj = { uid: P.uid||P.nhrId||P.nid, name: P.fullName, phone: P.phone, group: P.bloodGroup, district: P.district, active: on, available: true, showPhone: true, updatedAt: new Date().toISOString() };
-  try { await db.collection("donors").doc(P.uid||P.nhrId||P.nid).set(donorObj, {merge:true}); } catch(e){}
-  const r=on?await api("/api/donor/join",{confirm:true}):await api("/api/donor/leave",{});
-  toast(t(on?"dpJoined":"dpLeft"));await loadDonor();
+  const uid = P.uid || P.nhrId || P.nid;
+  const cooldownNext = DONOR && DONOR.lastDonation ? addDays(DONOR.lastDonation, 90) : null;
+  const stillCooling = !!(cooldownNext && cooldownNext > todayStr());
+  const donorObj = {
+    uid,
+    userId: P.nhrId || P.nid || uid,
+    name: P.fullName,
+    fullName: P.fullName,
+    phone: P.phone || "",
+    email: P.email || "",
+    group: P.bloodGroup || "",
+    bloodGroup: P.bloodGroup || "",
+    district: P.district || "",
+    active: on,
+    available: on ? !stillCooling : false,
+    showPhone: DONOR ? DONOR.showPhone !== false : true,
+    showEmail: DONOR ? DONOR.showEmail === true : false,
+    donations: (DONOR && DONOR.donations) || 0,
+    lastDonation: (DONOR && DONOR.lastDonation) || "",
+    updatedAt: new Date().toISOString()
+  };
+  try { await db.collection("donors").doc(uid).set(donorObj, {merge:true}); } catch(e){}
+  toast(t(on?"dpJoined":"dpLeft"));
 }
 
 /* ===== Navigation, Drawer & Modal ===== */
@@ -882,10 +951,6 @@ function show(id){
   section=id;
   document.querySelectorAll(".sec").forEach((s)=>s.classList.toggle("on",s.id==="sec-"+id));
   document.querySelectorAll(".nav[data-go]").forEach((n)=>n.classList.toggle("on",n.dataset.go===id));
-  if(id==="blood"){loadReqs();loadDonor()}
-  if(id==="hospitals")loadHosp();
-  if(id==="doctors"){loadDocs();loadAppts()}
-  if(id==="consent")loadAudit();
   drawer(false);toggleNotif(false);window.scrollTo({top:0,behavior:"smooth"});
 }
 $("burger").onclick=()=>drawer(true);$("dClose").onclick=()=>drawer(false);$("scrim").onclick=()=>drawer(false);
@@ -926,8 +991,8 @@ document.addEventListener("click",async(e)=>{
   if((x=g("[data-notif-go]"))){bdTab="req";show("blood");return render()}
   if((x=g("[data-f]"))){filter=x.dataset.f;return render()}
   if((x=g("[data-st]"))){stTab=x.dataset.st;return render()}
-  if((x=g("[data-bd]"))){bdTab=x.dataset.bd;if(bdTab==="req")loadReqs();if(bdTab==="me")loadDonor();return renderBlood()}
-  if((x=g("[data-dt]"))){docTab=x.dataset.dt;if(docTab==="mine")loadAppts();return renderDoctors()}
+  if((x=g("[data-bd]"))){bdTab=x.dataset.bd;return renderBlood()}
+  if((x=g("[data-dt]"))){docTab=x.dataset.dt;return renderDoctors()}
   if((x=g("[data-book]")))return openBooking(x.dataset.book);
   if((x=g("[data-ap-date]"))){if(!x.disabled)pickDate(x.dataset.apDate);return}
   if((x=g("[data-ap-time]"))){if(!x.disabled&&AP){AP.time=x.dataset.apTime;document.querySelectorAll(".slot").forEach((b)=>b.classList.toggle("on",b===x))}return}
@@ -936,33 +1001,27 @@ document.addEventListener("click",async(e)=>{
     const a=MYAPPTS.find((v)=>v.id===x.dataset.apcancel);if(!a)return;
     openModal({title:t("apCancelAsk"),go:t("apCancel"),cls:"red",body:apptSummary(a),run:async()=>{
       try { await db.collection("appointments").doc(a.id).update({status:"cancelled"}); } catch(e){}
-      await api("/api/appointments/"+a.id+"/cancel",{});
-      toast(t("apCancelled2"));loadAppts();return null;
+      toast(t("apCancelled2"));return null;
     }});return;
   }
-  if((x=g("[data-pref]"))){const k=x.dataset.pref;prefs[k]=!prefs[k];render();const r=await api("/api/patient/prefs",prefs);return toast(t("saved"))}
-if((x=g("[data-reveal]"))){
+  if((x=g("[data-pref]"))){
+    const k=x.dataset.pref;prefs[k]=!prefs[k];render();
+    try { if (P && P.uid) await db.collection("users").doc(P.uid).update({ prefs }); } catch(e){}
+    return toast(t("saved"));
+  }
+  if((x=g("[data-reveal]"))){
     const donorUid = x.dataset.reveal;
     if(!donorUid) return toast(t("serverErr"));
-
     try {
       const doc = await db.collection("donors").doc(donorUid).get();
       if(doc.exists) {
         const d = doc.data();
-        if(d.showPhone === false && d.showEmail === false) {
-          return toast(t("noNumber"));
-        }
-        x.outerHTML = contactHtml({ phone: d.phone || "", email: d.showEmail ? d.email : "" });
-      } else {
-        toast(t("serverErr"));
-      }
-    } catch(err) {
-      console.error("Reveal error:", err);
-      toast(t("serverErr"));
-    }
+        if(d.showPhone === false && d.showEmail === false) return toast(t("noNumber"));
+        x.outerHTML = contactHtml({ phone: d.showPhone !== false ? (d.phone || "") : "", email: d.showEmail ? (d.email || "") : "" });
+      } else { toast(t("serverErr")); }
+    } catch(err) { toast(t("serverErr")); }
     return;
   }
-
   if((x=g("[data-ask]"))){
     const donorUid = x.dataset.ask;
     if(!donorUid) return toast(t("serverErr"));
@@ -970,7 +1029,7 @@ if((x=g("[data-reveal]"))){
       await db.collection("notifications").add({
         userId: donorUid,
         type: "warn",
-        kind: "ask",
+        kind: "blood",
         text: {
           en: (P.fullName || "Someone") + " (" + (P.phone || "") + ") needs " + bdGroup + " blood and asked you to contact them.",
           bn: (P.fullName || "কেউ একজন") + " (" + (P.phone || "") + ") " + bdGroup + " রক্ত খুঁজছেন এবং আপনাকে যোগাযোগ করতে অনুরোধ করেছেন।"
@@ -979,104 +1038,109 @@ if((x=g("[data-reveal]"))){
         read: false
       });
       toast(t("bdAsked"));
-    } catch(e) {
-      console.error("Request send error:", e);
-      toast(t("serverErr"));
-    }
+    } catch(e) { toast(t("serverErr")); }
     return;
   }
-  if((x=g("[data-respond]"))){const r=await api("/api/blood/requests/"+x.dataset.respond+"/respond",{});if(!r.ok)return toast(errText(r.data.error));toast(t("rqDone").replace("{p}",r.data.phone||""));return loadReqs()}
+  if((x=g("[data-respond]"))){
+    const reqId = x.dataset.respond;
+    const reqItem = REQS.find(r => r.id === reqId);
+    if(!reqItem) return;
+    const responder = {
+      uid: P.uid || P.nhrId || P.nid,
+      userId: P.nhrId || P.nid || P.uid,
+      name: P.fullName || "Donor",
+      group: P.bloodGroup || "",
+      phone: P.phone || "",
+      at: new Date().toISOString()
+    };
+    try {
+      await db.collection("blood_requests").doc(reqId).update({
+        responders: firebase.firestore.FieldValue.arrayUnion(responder)
+      });
+      if (reqItem.requesterUid || reqItem.userId) {
+        await db.collection("notifications").add({
+          userId: reqItem.requesterUid || reqItem.userId,
+          type: "info",
+          kind: "blood",
+          text: {
+            en: responder.name + " (" + responder.group + ") responded to your blood request! Phone: " + responder.phone,
+            bn: responder.name + " (" + responder.group + ") আপনার রক্তের অনুরোধে সাড়া দিয়েছেন! ফোন: " + responder.phone
+          },
+          at: new Date().toISOString(),
+          read: false
+        });
+      }
+      toast(t("rqDone").replace("{p}", reqItem.phone || ""));
+    } catch(e) { toast(t("serverErr")); }
+    return;
+  }
   if((x=g("[data-close]"))){
-    try { await db.collection("blood_requests").doc(x.dataset.close).delete(); } catch(e){}
-    await api("/api/blood/requests/"+x.dataset.close+"/close",{});return loadReqs();
+    try { await db.collection("blood_requests").doc(x.dataset.close).delete(); toast(t("saved")); } catch(e){ toast(t("serverErr")); }
+    return;
   }
   if((x=g("[data-dp]"))){
     const k=x.dataset.dp;if(!DONOR||x.disabled)return;
     if(k==="showEmail"&&!P.email)return toast(t("dpNoEmail"));
     const cur=k==="available"?DONOR.available!==false:k==="showPhone"?DONOR.showPhone!==false:DONOR.showEmail===true;
-    DONOR[k] = !cur;
-    try { await db.collection("donors").doc(P.uid||P.nhrId||P.nid).update({[k]: !cur}); } catch(e){}
-    await api("/api/donor/update",{[k]:!cur});toast(t("saved"));return loadDonor();
+    const nextVal = !cur;
+    const patch = { [k]: nextVal, updatedAt: new Date().toISOString() };
+    if (k === "showEmail" && nextVal && P.email) patch.email = P.email;
+    if (k === "showPhone" && nextVal && P.phone) patch.phone = P.phone;
+    try { await db.collection("donors").doc(P.uid||P.nhrId||P.nid).update(patch); toast(t("saved")); } catch(e){ toast(t("serverErr")); }
+    return;
   }
-  
+  if((x=g("[data-dpdonate]"))){
+    const d = $("dpDate").value;
+    if(!d) return toast(t("dpBadDate"));
+    const today = new Date();
+    const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const selectedDate = new Date(d + "T00:00:00");
+    if(isNaN(selectedDate.getTime()) || selectedDate > todayDate) return toast(t("dpBadDate"));
 
-if((x=g("[data-dpdonate]"))){
-  const d = $("dpDate").value;
-  if(!d) return toast(t("dpBadDate"));
+    const donorId = (P && (P.uid || P.nhrId || P.nid)) || (auth.currentUser && auth.currentUser.uid);
+    if(!donorId) return toast(t("serverErr"));
 
-  const today = new Date();
-  const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const selectedDate = new Date(d + "T00:00:00");
-
-  if(isNaN(selectedDate.getTime()) || selectedDate > todayDate) {
-    return toast("Please select a valid past date.");
-  }
-
-  const daysSinceDonation = Math.floor(
-    (Date.UTC(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate()) -
-     Date.UTC(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()))
-    / 86400000
-  );
-
-  const donorId = (P && (P.uid || P.nhrId || P.nid)) || (auth.currentUser && auth.currentUser.uid);
-  if(!donorId) return toast("Account error. Please re-login.");
-
-  try {
-    const donorRef = db.collection("donors").doc(donorId);
-    const historyRef = db.collection("donation_history").doc(donorId + "_" + d);
-
-    await db.runTransaction(async (transaction) => {
-      const historySnap = await transaction.get(historyRef);
-      const donorSnap = await transaction.get(donorRef);
-
-      const oldData = donorSnap.exists ? donorSnap.data() : {};
-      const oldCount = Number(oldData.donations || 0);
-
-      const oldLastDate = oldData.lastDonation || "";
-      const latestDate = oldLastDate > d ? oldLastDate : d;
-
-      const latest = new Date(latestDate + "T00:00:00");
-      const daysSinceLatest = Math.floor(
-        (Date.UTC(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate()) -
-         Date.UTC(latest.getFullYear(), latest.getMonth(), latest.getDate()))
-        / 86400000
-      );
-
-      // Save safely without undefined values
-      transaction.set(donorRef, {
-        userId: P.nhrId || P.nid || donorId,
-        donorId: donorId,
-        bloodGroup: P.bloodGroup || "",
-        lastDonation: latestDate,
-        available: daysSinceLatest >= 90,
-        donations: oldCount + (historySnap.exists ? 0 : 1),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
-
-      if(!historySnap.exists) {
-        transaction.set(historyRef, {
-          donorId: donorId,
+    try {
+      const donorRef = db.collection("donors").doc(donorId);
+      const historyRef = db.collection("donation_history").doc(donorId + "_" + d);
+      await db.runTransaction(async (transaction) => {
+        const historySnap = await transaction.get(historyRef);
+        const donorSnap = await transaction.get(donorRef);
+        const oldData = donorSnap.exists ? donorSnap.data() : {};
+        const oldCount = Number(oldData.donations || 0);
+        const oldLastDate = oldData.lastDonation || "";
+        const latestDate = oldLastDate > d ? oldLastDate : d;
+        const latest = new Date(latestDate + "T00:00:00");
+        const daysSinceLatest = Math.floor((Date.UTC(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate()) - Date.UTC(latest.getFullYear(), latest.getMonth(), latest.getDate())) / 86400000);
+        transaction.set(donorRef, {
+          uid: donorId,
           userId: P.nhrId || P.nid || donorId,
-          bloodGroup: P.bloodGroup || "",
-          donationDate: d,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-      }
-    });
-
-    toast(t("saved"));
-    return loadDonor();
-
-  } catch(error) {
-    console.error("Donation save error:", error);
-    return toast("Donation save failed: " + error.message);
+          name: P.fullName || oldData.name || "",
+          fullName: P.fullName || oldData.fullName || "",
+          phone: P.phone || oldData.phone || "",
+          email: P.email || oldData.email || "",
+          district: P.district || oldData.district || "",
+          group: P.bloodGroup || oldData.group || "",
+          bloodGroup: P.bloodGroup || oldData.bloodGroup || "",
+          lastDonation: latestDate,
+          available: daysSinceLatest >= 90,
+          donations: oldCount + (historySnap.exists ? 0 : 1),
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+        if(!historySnap.exists) {
+          transaction.set(historyRef, {
+            donorId, userId: P.nhrId || P.nid || donorId,
+            bloodGroup: P.bloodGroup || "", donationDate: d,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }
+      });
+      toast(t("saved"));
+    } catch(error) { toast(t("serverErr")); }
+    return;
   }
-}
-
-
   if(!g("#notifPopover"))toggleNotif(false);
 });
-
 document.addEventListener("change",(e)=>{if(e.target.id==="dpTick")toggleDonor(e.target.checked)});
 $("srch").addEventListener("input",(e)=>{q=e.target.value;render()});
 document.querySelectorAll(".lang button").forEach((b)=>b.addEventListener("click",()=>{lang=b.dataset.l;try{localStorage.setItem("nhr_lang",lang)}catch(z){}render();initVitalsChart()}));
@@ -1195,6 +1259,128 @@ $("delBtn").onclick=()=>openModal({title:t("mDlTitle"),desc:t("mDlDesc"),go:t("d
     clearSession();location.href="login.html?deleted=1";return null;
   }});
 
+let LIVE_UNSUBS = [];
+function stopLiveSync() {
+  LIVE_UNSUBS.forEach(fn => { try { fn(); } catch(e) {} });
+  LIVE_UNSUBS = [];
+}
+function startLiveSync() {
+  stopLiveSync();
+  if (!P || !window.db) return;
+  const uid = P.uid || P.nhrId || P.nid;
+  const nhrKey = P.nhrId || P.nid || uid;
+
+  // 1. Live User Profile
+  if (P.uid) {
+    LIVE_UNSUBS.push(db.collection("users").doc(P.uid).onSnapshot(snap => {
+      if (!snap.exists) return;
+      const d = snap.data();
+      P = { ...P, ...d, uid: snap.id };
+      P.dob = P.dob || P.dateOfBirth || "";
+      P.bloodGroup = P.bloodGroup || P.health?.bloodGroup || "";
+      P.emergency = P.emergency || P.emergencyContact || { name: "", relation: "", phone: "" };
+      P.address = typeof P.address === "string" ? P.address : P.address?.details || "";
+      P.district = P.district || P.addressInfo?.district || "";
+      P.division = P.division || P.addressInfo?.division || "";
+      render();
+    }));
+  }
+
+  // 2. Live My Donor Profile
+  if (uid) {
+    LIVE_UNSUBS.push(db.collection("donors").doc(uid).onSnapshot(doc => {
+      if (doc.exists) {
+        DONOR = doc.data();
+        const nextD = DONOR.lastDonation ? addDays(DONOR.lastDonation, 90) : null;
+        DONOR_NEXT = (nextD && nextD > todayStr()) ? nextD : null;
+      } else {
+        DONOR = null;
+        DONOR_NEXT = null;
+      }
+      renderDonor();
+      renderReqs();
+    }));
+  }
+
+  // 3. Live Active Donors Directory
+  LIVE_UNSUBS.push(db.collection("donors").where("active", "==", true).onSnapshot(snap => {
+    ALL_DONORS = snap.docs.map(doc => ({ ...doc.data(), uid: doc.id }));
+    if (bdGroup) runDonorFilter(bdGroup, $("bdDistrict").value);
+  }));
+
+  // 4. Live Blood Requests
+  LIVE_UNSUBS.push(db.collection("blood_requests").onSnapshot(snap => {
+    const myId = P.nhrId || P.nid || P.uid;
+    REQS = snap.docs
+      .map(d => ({
+        ...d.data(),
+        id: d.id,
+        mine: d.data().userId === myId || d.data().requesterUid === P.uid,
+        responded: Array.isArray(d.data().responders) && d.data().responders.some(r => r.uid === myId || r.uid === P.uid || r.userId === myId)
+      }))
+      .filter(r => r.status !== "closed")
+      .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+    renderReqs();
+  }));
+
+  // 5. Live Hospitals & Blood Stock
+  LIVE_UNSUBS.push(db.collection("hospitals").onSnapshot(snap => {
+    HOSP = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    renderHospitals();
+  }));
+
+  // 6. Live Doctors List
+  LIVE_UNSUBS.push(db.collection("doctors").onSnapshot(snap => {
+    DOCS = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    renderDoctors();
+  }));
+
+  // 7. Live Appointments
+  if (nhrKey) {
+    LIVE_UNSUBS.push(db.collection("appointments").where("patientNhr", "==", nhrKey).onSnapshot(snap => {
+      MYAPPTS = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+      renderAppts();
+    }));
+
+    // 8. Live Medical Records, Vitals, Allergies, Conditions, Audit Logs
+    LIVE_UNSUBS.push(db.collection("records").where("nhrId", "==", nhrKey).onSnapshot(snap => {
+      REC.records = snap.docs.map(d => d.data());
+      render();
+    }));
+    LIVE_UNSUBS.push(db.collection("vitals").doc(nhrKey).onSnapshot(vSnap => {
+      VITALS = vSnap.exists ? vSnap.data() : { dates: [], bp: [], glucose: [], hba1c: [] };
+      initVitalsChart();
+    }));
+    LIVE_UNSUBS.push(db.collection("allergies").where("nhrId", "==", nhrKey).onSnapshot(snap => {
+      REC.allergies = snap.docs.map(d => d.data());
+      render();
+    }));
+    LIVE_UNSUBS.push(db.collection("conditions").where("nhrId", "==", nhrKey).onSnapshot(snap => {
+      REC.conditions = snap.docs.map(d => d.data().name);
+      render();
+    }));
+    LIVE_UNSUBS.push(db.collection("audit_logs").where("patientId", "==", nhrKey).onSnapshot(snap => {
+      DON_AUDIT = snap.docs.map(d => d.data());
+      render();
+    }));
+  }
+
+  // 9. Live Notifications
+  if (uid) {
+    LIVE_UNSUBS.push(db.collection("notifications").where("userId", "==", uid).onSnapshot(snap => {
+      NOTIFS = snap.docs.map(d => d.data()).sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
+      UNREAD = NOTIFS.filter(n => !n.read).length;
+      if (lastUnread >= 0 && UNREAD > lastUnread && NOTIFS[0]) {
+        toast("🔔 " + L(NOTIFS[0].text));
+        const b = $("notifBtn");
+        if (b) { b.classList.remove("ring"); void b.offsetWidth; b.classList.add("ring"); }
+      }
+      lastUnread = UNREAD;
+      renderNotifs();
+    }));
+  }
+}
+
 /* ===== Real-Time Firebase Auth & Sync Initialization ===== */
 /* ===== Real-Time Firebase Auth & Sync Initialization ===== */
 auth.onAuthStateChanged(async (user) => {
@@ -1268,10 +1454,9 @@ auth.onAuthStateChanged(async (user) => {
   if (P) {
     prefs = { ...prefs, ...(P.prefs || {}) };
     render();
-    await loadRecords();
     initVitalsChart();
     if (P.district) $("hsDistrict").value = P.district;
-    await Promise.all([loadNotifs(), loadDonor(), loadReqs(), loadHosp(), loadAudit(), loadDocs(), loadAppts()]);
+    startLiveSync();
   }
 });
 </script>
