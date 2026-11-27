@@ -370,11 +370,15 @@ textarea.inp{height:auto;padding:12px 14px;min-height:92px;resize:vertical}
 <div class="modal" id="scanModal" hidden>
   <div class="mcard" role="dialog" aria-modal="true" aria-labelledby="scH">
     <h3 id="scH" data-i="scTitle"></h3><p data-i="scHelp"></p>
-    <video class="vid" id="scanVid" playsinline muted></video>
+    <video class="vid" id="scanVid" playsinline webkit-playsinline muted autoplay style="background:#0c2d48;width:100%;max-height:260px;object-fit:cover;border-radius:14px"></video>
     <canvas id="scanCv" hidden></canvas>
+    <div style="margin:10px 0 4px">
+      <input type="file" id="scanFile" accept="image/*" capture="environment" hidden>
+      <button type="button" class="btn ghost sm" id="scanPhotoBtn" style="width:100%">📷 Scan QR from Camera / Photo</button>
+    </div>
     <div class="err" id="scanErr" role="alert"></div>
     <label class="lbl" data-i="scPaste"></label>
-    <div class="srow"><input class="inp" id="scanTxt" style="font-size:15px;letter-spacing:0" placeholder="NHR:000000000000"><button class="btn sm" id="scanUse" data-i="scUse"></button></div>
+    <div class="srow"><input class="inp" id="scanTxt" style="font-size:15px;letter-spacing:0" placeholder="NHR:0000000000000000"><button class="btn sm" id="scanUse" data-i="scUse"></button></div>
     <div class="mrow"><button class="btn ghost" id="scanClose" data-i="close"></button></div>
   </div>
 </div>
@@ -506,6 +510,10 @@ function readDocSession() {
 
 auth.onAuthStateChanged(async (user) => {
   const fpSes = readDocSession();
+  if (user && fpSes && fpSes.uid && user.uid !== fpSes.uid) {
+    try { await auth.signOut(); } catch (e) {}
+    user = null;
+  }
   if (!user && !fpSes) {
     location.replace("login.html");
     return;
@@ -931,6 +939,17 @@ async function emergency(){
 }
 
 /* ===== QR scanner ===== */
+function ensureJsQr() {
+  if (window.jsQR) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js";
+    s.onload = () => resolve(!!window.jsQR);
+    s.onerror = () => resolve(false);
+    document.head.appendChild(s);
+  });
+}
+
 function parseQr(text){
   const raw=String(text||"").trim();
   const off=raw.match(/^NHR-EMERGENCY:([A-Za-z0-9+/=_-]+)$/i);
@@ -938,13 +957,15 @@ function parseQr(text){
     try{
       const bin=atob(off[1].replace(/-/g,"+").replace(/_/g,"/"));
       const j=JSON.parse(new TextDecoder().decode(Uint8Array.from(bin,(c)=>c.charCodeAt(0))));
-      const id=digits(j.id||"");
-      if(id.length===12)return{id,offline:{name:String(j.name||"").slice(0,80),blood:String(j.blood||"").slice(0,4),phone:String(j.em||"").slice(0,20)}};
+      const rawId=String(j.id||"").trim().toUpperCase();
+      const numId=digits(rawId);
+      const validId=/^NHR-[A-Z0-9]{6,12}$/.test(rawId)?rawId:(numId.length===12||numId.length===16?numId:"");
+      if(validId)return{id:validId,offline:{name:String(j.name||"").slice(0,80),blood:String(j.blood||"").slice(0,4),phone:String(j.em||"").slice(0,20)}};
     }catch(e){}
     return null;
   }
-  const m=raw.match(/(NHR-[A-Z0-9]{6,12})/i)||raw.match(/NHR:?\s*(\d{12})/i)||raw.match(/^\s*(\d{12}|\d{16})\s*$/);
-  return m?{id:m[1]}:null;
+  const m=raw.match(/(NHR-[A-Z0-9]{6,12})/i)||raw.match(/NHR:?s*(d{12}|d{16})/i)||raw.match(/^s*(d{12}|d{16})s*$/);
+  return m?{id:m[1].toUpperCase()}:null;
 }
 function showOffline(o){
   $("offBox").hidden=!o;if(!o)return;
@@ -955,18 +976,83 @@ function gotQr(text){
   const q=parseQr(text);if(!q){$("scanErr").textContent=t("scBad");return false}
   stopScan();show("search");$("nhrIn").value=groups(q.id);showOffline(q.offline);doSearch(q.id,true);return true;
 }
+
+async function decodeImageSource(srcEl, w, h) {
+  if ("BarcodeDetector" in window) {
+    try {
+      const bd = new BarcodeDetector({ formats: ["qr_code"] });
+      const codes = await bd.detect(srcEl);
+      if (codes && codes.length && codes[0].rawValue) return codes[0].rawValue;
+    } catch (e) {}
+  }
+  await ensureJsQr();
+  if (window.jsQR && w > 0 && h > 0) {
+    const cv = $("scanCv"), cx = cv.getContext("2d", { willReadFrequently: true });
+    cv.width = w; cv.height = h;
+    cx.drawImage(srcEl, 0, 0, w, h);
+    const img = cx.getImageData(0, 0, w, h);
+    const c = jsQR(img.data, img.width, img.height);
+    if (c && c.data) return c.data;
+  }
+  return null;
+}
+
 $("qrBtn").onclick=async()=>{
   $("scanErr").textContent="";$("scanTxt").value="";$("scanModal").hidden=false;
+  const v=$("scanVid");
+  v.setAttribute("playsinline","true");
+  v.setAttribute("webkit-playsinline","true");
+  v.muted=true;
+  v.hidden=false;
+  ensureJsQr();
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    v.hidden=true;
+    $("scanErr").textContent=lang==="bn"?"লাইভ ক্যামেরা সাপোর্ট করছে না। নিচের বাটন দিয়ে QR ছবি তুলে স্ক্যান করুন।":"Live camera unavailable. Tap 'Scan QR from Camera / Photo' below.";
+    return;
+  }
   try{
-    scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
-    const v=$("scanVid");v.srcObject=scanStream;await v.play();
-    const cv=$("scanCv"),cx=cv.getContext("2d",{willReadFrequently:true});
-    const loop=()=>{
+    try {
+      scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});
+    } catch (firstErr) {
+      scanStream=await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+    }
+    v.srcObject=scanStream;
+    await v.play();
+    let busy=false;
+    const loop=async()=>{
       if(!scanStream)return;
-      if(v.readyState>=2&&window.jsQR){cv.width=v.videoWidth;cv.height=v.videoHeight;cx.drawImage(v,0,0);const img=cx.getImageData(0,0,cv.width,cv.height),c=jsQR(img.data,img.width,img.height);if(c&&c.data&&gotQr(c.data))return}
+      if(!busy && v.readyState>=2 && v.videoWidth>0){
+        busy=true;
+        try {
+          const val = await decodeImageSource(v, v.videoWidth, v.videoHeight);
+          if (val && gotQr(val)) return;
+        } catch(e){}
+        busy=false;
+      }
       scanRaf=requestAnimationFrame(loop);
     };loop();
-  }catch(e){$("scanErr").textContent=t("scNoCam")}
+  }catch(e){
+    v.hidden=true;
+    $("scanErr").textContent=lang==="bn"?"লাইভ ক্যামেরা চালু হয়নি। নিচের বাটন দিয়ে QR ছবি তুলে স্ক্যান করুন।":"Camera permission blocked. Tap 'Scan QR from Camera / Photo' below.";
+  }
+};
+
+$("scanPhotoBtn").onclick=()=>{$("scanFile").value="";$("scanFile").click()};
+$("scanFile").onchange=async(e)=>{
+  const f=e.target.files&&e.target.files[0];
+  if(!f)return;
+  $("scanErr").textContent=lang==="bn"?"QR স্ক্যান হচ্ছে...":"Scanning QR...";
+  const img=new Image();
+  const url=URL.createObjectURL(f);
+  img.onload=async()=>{
+    try{
+      const scale=Math.min(1, 1000/Math.max(img.width,img.height));
+      const val=await decodeImageSource(img, Math.round(img.width*scale), Math.round(img.height*scale));
+      if(!val||!gotQr(val)) $("scanErr").textContent=t("scBad");
+    }finally{URL.revokeObjectURL(url)}
+  };
+  img.onerror=()=>{URL.revokeObjectURL(url);$("scanErr").textContent=t("scBad")};
+  img.src=url;
 };
 $("scanUse").onclick=()=>gotQr($("scanTxt").value);
 $("scanClose").onclick=stopScan;
@@ -1261,7 +1347,7 @@ document.addEventListener("keydown",(e)=>{
 
 /* ===== Global Handlers ===== */
 document.addEventListener("click",(e)=>{
-  if(e.target.closest("[data-switch]")){clearSession();location.href="login.html";return}
+  if(e.target.closest("[data-switch]")){try{auth.signOut()}catch(err){}clearSession();location.href="login.html";return}
   const go=e.target.closest("[data-go]");if(go)return show(go.dataset.go);
   const m=e.target.closest("[data-m]");if(m){method=m.dataset.m;$("vbody").dataset.dr="";return renderFound()}
   const f=e.target.closest("[data-f]");if(f){filter=f.dataset.f;return renderPatient()}
@@ -1273,7 +1359,7 @@ document.addEventListener("click",(e)=>{
   if(e.target.id==="adSave")saveRecord();
 });
 document.querySelectorAll(".lang button").forEach((b)=>b.addEventListener("click",()=>{lang=b.dataset.l;localStorage.setItem("nhr_lang",lang);render()}));
-$("logout").onclick=async()=>{clearSession();location.href="login.html"};
+$("logout").onclick=async()=>{try{await auth.signOut()}catch(e){}clearSession();location.href="login.html"};
 window.addEventListener("pagehide",()=>{S=null;stopScan()});
 
 /* ===== Start ===== */

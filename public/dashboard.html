@@ -448,7 +448,7 @@ const LEVELS=[[10,"lvLegend","🏆"],[5,"lvHero","🦸"],[3,"lvLife","❤️"],[
 const badge=(n)=>{const l=LEVELS.find((x)=>n>=x[0]);return l?{key:l[1],icon:l[2]}:null};
 
 /* ===== Session and API Client ===== */
-function readSession(){for(const st of [sessionStorage,localStorage]){try{const v=JSON.parse(st.getItem("nhr_session"));if(v&&v.token)return v}catch(e){}}return null}
+function readSession(){for(const st of [sessionStorage,localStorage]){try{const v=JSON.parse(st.getItem("nhr_session")||st.getItem("nhr_user")||"null");if(v&&(v.token||v.uid||v.nid||v.nhrId))return v}catch(e){}}return null}
 function clearSession(){localStorage.removeItem("nhr_session");sessionStorage.removeItem("nhr_session");localStorage.removeItem("nhr_user")}
 const ses=readSession();
 
@@ -1384,19 +1384,33 @@ function startLiveSync() {
 /* ===== Real-Time Firebase Auth & Sync Initialization ===== */
 /* ===== Real-Time Firebase Auth & Sync Initialization ===== */
 auth.onAuthStateChanged(async (user) => {
-  const activeSes = ses || readSession();
+  const activeSes = readSession() || ses;
+  P = null;
+
+  if (user && activeSes && activeSes.uid && user.uid !== activeSes.uid) {
+    try { await auth.signOut(); } catch (e) {}
+    user = null;
+  }
 
   if (user) {
     try {
       const doc = await db.collection("users").doc(user.uid).get();
       if (doc.exists) {
-        P = doc.data();
-        P.uid = user.uid;
+        const uData = doc.data();
+        if (activeSes && activeSes.nid && uData.nid && uData.nid !== activeSes.nid) {
+          try { await auth.signOut(); } catch (e) {}
+          user = null;
+        } else {
+          P = uData;
+          P.uid = user.uid;
+        }
       }
     } catch(e) {
       console.error("User fetch error:", e);
     }
-  } else if (activeSes && activeSes.token) {
+  }
+
+  if (!P && activeSes && (activeSes.token || activeSes.uid || activeSes.nid || activeSes.nhrId)) {
     try {
       const me = await api("/api/me", null, "GET");
       if (me.ok && me.data) {
@@ -1436,7 +1450,9 @@ auth.onAuthStateChanged(async (user) => {
         role: activeSes.role || "patient"
       };
     }
-  } else {
+  }
+
+  if (!P) {
     clearSession();
     location.replace("login.html");
     return;

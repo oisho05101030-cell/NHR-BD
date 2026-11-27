@@ -20,8 +20,14 @@
     }, 1500);
   }
 
-  function finishLogin(st, id, fbUser) {
+  async function finishLogin(st, id, fbUser) {
     close();
+    try {
+      localStorage.removeItem("nhr_session");
+      sessionStorage.removeItem("nhr_session");
+      localStorage.removeItem("nhr_user");
+      if (window.auth && window.auth.currentUser) await window.auth.signOut();
+    } catch (e) {}
     const isDoc = (st.user && st.user.role === "doctor") || (fbUser && fbUser.role === "doctor") || /^DOC/i.test(id);
     const ses = isDoc ? {
       token: st.token,

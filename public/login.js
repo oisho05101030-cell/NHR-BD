@@ -97,6 +97,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     setLoading(true);
+    try {
+      localStorage.removeItem("nhr_session");
+      sessionStorage.removeItem("nhr_session");
+      localStorage.removeItem("nhr_user");
+      if (auth.currentUser) await auth.signOut();
+    } catch (e) {}
 
     let account = null;
     let targetEmail = "";
