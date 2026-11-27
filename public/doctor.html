@@ -534,7 +534,7 @@ function clearSession(){
 
 /* ===== Wake Render backend & Fetch with timeout ===== */
 fetch("/api/me").catch(() => {});
-async function fetchWithTimeout(u, opts, ms = 45000) {
+async function fetchWithTimeout(u, opts, ms = 25000) {
   const ctrl = new AbortController();
   const id = setTimeout(() => ctrl.abort(), ms);
   try { return await fetch(u, Object.assign({}, opts || {}, { signal: ctrl.signal })); }
@@ -543,6 +543,13 @@ async function fetchWithTimeout(u, opts, ms = 45000) {
 
 /* ===== Firebase Integration for API ===== */
 async function api(url, body, method, access) {
+  try {
+    return await _apiInner(url, body, method, access);
+  } catch (err) {
+    return { ok: false, status: 0, data: { error: err && err.name === "AbortError" ? "timeout" : "srvErr" } };
+  }
+}
+async function _apiInner(url, body, method, access) {
   try {
     const fbDoctorPayload = () => ({
       uid: currentUser ? currentUser.uid : "doc_fb",

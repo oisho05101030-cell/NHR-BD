@@ -1,3 +1,4 @@
+const https = require("https");
 // NHR BD Server (Node.js + Express + Nodemailer)
 // Run: npm install express nodemailer dotenv
 // Start: node server.js
@@ -27,32 +28,69 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+function postJsonIpv4(targetUrl, payload, redirectsLeft = 3) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(targetUrl);
+    const data = JSON.stringify(payload);
+    const req = https.request({
+      hostname: u.hostname,
+      port: u.port || 443,
+      path: u.pathname + u.search,
+      method: "POST",
+      family: 4,
+      timeout: 9000,
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(data)
+      }
+    }, (res) => {
+      if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location && redirectsLeft > 0) {
+        res.resume();
+        const nextUrl = new URL(res.headers.location, targetUrl).toString();
+        const getReq = https.get(nextUrl, { family: 4, timeout: 9000 }, (gRes) => {
+          let body = "";
+          gRes.on("data", (c) => body += c);
+          gRes.on("end", () => resolve({ status: gRes.statusCode, body }));
+        });
+        getReq.on("timeout", () => { getReq.destroy(new Error("redirect_timeout")); });
+        getReq.on("error", reject);
+        return;
+      }
+      let body = "";
+      res.on("data", (c) => body += c);
+      res.on("end", () => resolve({ status: res.statusCode, body }));
+    });
+    req.on("timeout", () => { req.destroy(new Error("webhook_timeout")); });
+    req.on("error", reject);
+    req.write(data);
+    req.end();
+  });
+}
+
 async function deliverEmail({ to, subject, html }) {
   if (!to) return false;
   const webhook = s(process.env.GMAIL_WEBHOOK_URL);
   if (webhook) {
     try {
-      const r = await fetch(webhook, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to, subject, html }),
-      });
-      const txt = await r.text();
-      if (r.ok && /ok/i.test(txt)) return true;
-      console.error("❌ Gmail Webhook Error:", r.status, txt);
+      const r = await postJsonIpv4(webhook, { to, subject, html });
+      if (r.status >= 200 && r.status < 300 && /ok/i.test(r.body)) return true;
+      console.error("❌ Gmail Webhook Error:", r.status, r.body.slice(0, 200));
       return false;
     } catch (err) {
-      console.error("❌ Gmail Webhook Fetch Error:", err.message || err);
+      console.error("❌ Gmail Webhook Net Error:", err.message || err);
       return false;
     }
   }
   try {
-    await transporter.sendMail({
-      from: `"NHR BD Portal" <${process.env.EMAIL_USER}>`,
-      to,
-      subject,
-      html,
-    });
+    await Promise.race([
+      transporter.sendMail({
+        from: `"NHR BD Portal" <${process.env.EMAIL_USER}>`,
+        to,
+        subject,
+        html,
+      }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error("smtp_timeout")), 8000))
+    ]);
     return true;
   } catch (err) {
     console.error("❌ SMTP Email Error:", err.message || err);
@@ -324,6 +362,15 @@ app.post("/api/login", (req, res) => {
 app.get("/api/me", (req, res) => {
   const x = getSes(req);
   return x ? res.json({ ok: true, user: { type: x.type, name: x.name, nhrId: x.nhrId } }) : bad(res, "noSession", 401);
+});
+
+app.get("/api/mail-status", (req, res) => {
+  const wh = s(process.env.GMAIL_WEBHOOK_URL);
+  res.json({
+    hasWebhook: /^https:\/\//.test(wh),
+    webhookHost: wh ? new URL(wh).hostname : null,
+    hasSmtp: !!(s(process.env.EMAIL_USER) && s(process.env.EMAIL_PASS))
+  });
 });
 
 /* ---------- Email endpoints ---------- */
