@@ -262,7 +262,7 @@ textarea.inp{height:auto;padding:12px 14px;min-height:92px;resize:vertical}
     <h1 data-i="seTitle"></h1><p class="sub" data-i="seSub"></p>
     <div class="panel">
       <label class="lbl" for="nhrIn" data-i="nhrLbl" style="margin-top:0"></label>
-      <div class="srow"><input class="inp" id="nhrIn" inputmode="numeric" autocomplete="off" placeholder="0000 0000 0000" />
+      <div class="srow"><input class="inp" id="nhrIn" inputmode="text" autocomplete="off" placeholder="NHR-XXXXXXXXX or 16-digit NID" />
         <button class="btn ghost" id="qrBtn"><svg class="i" viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3M4 12h16"/></svg><span data-i="scanQr"></span></button>
         <button class="btn" id="seBtn" data-i="seBtn"></button></div>
       <div class="err" id="seErr" role="alert"></div>
@@ -479,7 +479,8 @@ const esc=(v)=>String(v==null?"":v).replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&
 const toDate=(d)=>typeof d==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(d)?new Date(d+"T00:00:00"):new Date(d);
 const fmtDate=(d)=>{const x=toDate(d);return d&&!Number.isNaN(x.getTime())?x.toLocaleDateString(lang==="bn"?"bn-BD":"en-GB",{day:"numeric",month:"short",year:"numeric"}):"–"};
 const fmtTime=(d)=>{const x=toDate(d);return d&&!Number.isNaN(x.getTime())?x.toLocaleString(lang==="bn"?"bn-BD":"en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):"–"};
-const groups=(s)=>(String(s).match(/.{1,4}/g)||[]).join(" ");
+const normSearchId=(raw)=>{const c=String(raw||"").trim().toUpperCase().replace(/[^A-Z0-9]/g,"");if(!c)return "";if(c.startsWith("NHR")&&c.length>3)return "NHR-"+c.slice(3);return c;};
+const groups=(s)=>{const v=String(s||"").trim();if(/^NHR-/i.test(v))return v.toUpperCase();return (v.match(/.{1,4}/g)||[]).join(" ");};
 const digits=(s)=>String(s).replace(/\D/g,"");
 const ymd=(d)=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 const todayStr=()=>ymd(new Date());
@@ -534,10 +535,23 @@ function clearSession(){
 /* ===== Firebase Integration for API ===== */
 async function api(url, body, method, access) {
   try {
-    // ১. রোগী অনুসন্ধান (NHR ID অথবা NID দিয়ে)
+    const fbDoctorPayload = () => ({
+      uid: currentUser ? currentUser.uid : "doc_fb",
+      name: D ? D.name : "Doctor",
+      bmdc: D ? D.bmdc : "DOC0000",
+      hospital: D ? L(D.hospital) : "Hospital",
+      specialty: D ? L(D.specialty) : "General Medicine"
+    });
+    const fbPatientPayload = () => (found && found._fb ? found._fb : { nhrId: body && body.nhrId });
+
+    // ১. রোগী অনুসন্ধান (NHR-XXXXXXXXX অথবা 16-digit NID দিয়ে)
     if (url.includes("/doctor/search")) {
-      const searchId = digits(body.nhrId);
+      const searchId = normSearchId(body.nhrId);
+      const plainNhr = searchId.replace(/^NHR-/, "");
       let snap = await db.collection("users").where("nhrId", "==", searchId).get();
+      if (snap.empty && plainNhr !== searchId) {
+        snap = await db.collection("users").where("nhrId", "==", plainNhr).get();
+      }
       if (snap.empty) {
         snap = await db.collection("users").where("nid", "==", searchId).get();
       }
@@ -546,42 +560,93 @@ async function api(url, body, method, access) {
         return { ok: false, status: 404, data: { error: "nf" } };
       }
 
-      const pData = snap.docs[0].data();
+      const docSnap = snap.docs[0];
+      const pData = docSnap.data();
+      const resolvedNhr = pData.nhrId || pData.nid || searchId;
       return {
         ok: true,
         status: 200,
         data: {
           patient: {
-            nhrId: pData.nhrId || pData.nid,
-            maskedName: pData.fullName || "Patient",
+            nhrId: resolvedNhr,
+            maskedName: pData.fullName || pData.name || "Patient",
             age: pData.dob ? (new Date().getFullYear() - new Date(pData.dob).getFullYear()) : 30,
             gender: pData.gender || "Male",
-            phoneEnd: pData.phone ? pData.phone.slice(-2) : "00",
-            emailMasked: pData.email ? pData.email.replace(/(.{2})(.*)(?=@)/, "$1***") : "p*****@gmail.com",
-            bloodGroup: pData.bloodGroup || "N/A",
-            emergency: pData.emergency || null
+            phoneEnd: pData.phone ? String(pData.phone).slice(-2) : "00",
+            emailMasked: pData.email ? pData.email.replace(/(.{2})(.*)(?=@)/, "$1***") : "",
+            bloodGroup: pData.bloodGroup || pData.health?.bloodGroup || "N/A",
+            emergency: pData.emergency || pData.emergencyContact || null,
+            _fb: {
+              uid: docSnap.id,
+              nhrId: resolvedNhr,
+              nid: pData.nid || "",
+              fullName: pData.fullName || pData.name || "Patient",
+              email: pData.email || "",
+              phone: pData.phone || "",
+              prefs: pData.prefs || {}
+            }
           }
         }
       };
     }
 
-    // ২. ওটিপি ও ফিঙ্গারপ্রিন্ট ভেরিফিকেশন
+    // ২. আসল ব্যাকএন্ডের মাধ্যমে QR স্ক্যান, Gmail OTP এবং Emergency Override
     if (url.includes("fp-start")) {
-      mockFp = Date.now();
-      return { ok: true, status: 200, data: { requestId: "fb_req", qrUrl: location.origin + "/m.html?t=demo" } };
+      const res = await fetch("/api/doctor/verify/fp-start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nhrId: body.nhrId, fbPatient: fbPatientPayload(), fbDoctor: fbDoctorPayload() })
+      });
+      const data = await res.json().catch(() => ({}));
+      return { ok: res.ok, status: res.status, data };
     }
     if (url.includes("fp-status")) {
-      return { ok: true, status: 200, data: { status: Date.now() - mockFp > 4500 ? "approved" : "pending", scope: "full", token: "fb_tok", expiresAt: Date.now() + 15 * 60000 } };
-    }
-    if (url.includes("otp-send")) return { ok: true, status: 200, data: {} };
-    if (url.includes("otp-verify")) {
-      if (body.code === "123456" || body.code.length === 6) {
-        return { ok: true, status: 200, data: { scope: "full", token: "fb_tok", expiresAt: Date.now() + 15 * 60000 } };
+      const sep = url.includes("?") ? "&" : "?";
+      const res = await fetch(url + sep + "dt=" + encodeURIComponent(fbDoctorPayload().uid));
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.status === "approved" && currentUser && found) {
+        try {
+          await db.collection("access_logs").add({ doctorId: currentUser.uid, nhrId: found.nhrId, name: found.maskedName, method: "fp", when: Date.now() });
+        } catch (e) {}
       }
-      return { ok: false, status: 400, data: { error: "badOtp" } };
+      return { ok: res.ok, status: res.status, data };
+    }
+    if (url.includes("otp-send")) {
+      const res = await fetch("/api/doctor/verify/otp-send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nhrId: body.nhrId, fbPatient: fbPatientPayload(), fbDoctor: fbDoctorPayload() })
+      });
+      const data = await res.json().catch(() => ({}));
+      return { ok: res.ok, status: res.status, data };
+    }
+    if (url.includes("otp-verify")) {
+      const res = await fetch("/api/doctor/verify/otp-verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nhrId: body.nhrId, code: body.code, fbPatient: fbPatientPayload(), fbDoctor: fbDoctorPayload() })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && currentUser && found) {
+        try {
+          await db.collection("access_logs").add({ doctorId: currentUser.uid, nhrId: found.nhrId, name: found.maskedName, method: "otp", when: Date.now() });
+        } catch (e) {}
+      }
+      return { ok: res.ok, status: res.status, data };
     }
     if (url.includes("emergency")) {
-      return { ok: true, status: 200, data: { scope: "emergency", token: "fb_tok", expiresAt: Date.now() + 30 * 60000 } };
+      const res = await fetch("/api/doctor/verify/emergency", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nhrId: body.nhrId, reason: body.reason, note: body.note, fbPatient: fbPatientPayload(), fbDoctor: fbDoctorPayload() })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && currentUser && found) {
+        try {
+          await db.collection("access_logs").add({ doctorId: currentUser.uid, nhrId: found.nhrId, name: found.maskedName, method: "em", when: Date.now() });
+        } catch (e) {}
+      }
+      return { ok: res.ok, status: res.status, data };
     }
 
     // ৩. রোগীর ফুল রেকর্ড লোড করা
@@ -723,12 +788,17 @@ function render(){
 }
 
 /* ===== Find patient ===== */
-$("nhrIn").addEventListener("input",(e)=>{e.target.value=groups(digits(e.target.value).slice(0,16))});
+$("nhrIn").addEventListener("input",(e)=>{
+  const raw=e.target.value;
+  if(/[A-Za-z-]/.test(raw)){e.target.value=raw.toUpperCase().replace(/[^A-Z0-9-]/g,"").slice(0,16);}
+  else{e.target.value=groups(digits(raw).slice(0,16));}
+});
 $("nhrIn").addEventListener("keydown",(e)=>{if(e.key==="Enter")doSearch()});
 $("seBtn").onclick=()=>doSearch();
 async function doSearch(id,keepOff){
-  const n=digits(id||$("nhrIn").value);$("seErr").textContent="";if(!keepOff)showOffline(null);
-  if(n.length!==12&&n.length!==16){$("seErr").textContent=t("bad");return}
+  const n=normSearchId(id||$("nhrIn").value);$("seErr").textContent="";if(!keepOff)showOffline(null);
+  const valid=/^NHR-[A-Z0-9]{6,12}$/.test(n)||/^\d{12}$/.test(n)||/^\d{16}$/.test(n)||/^B\d{10,17}$/.test(n);
+  if(!valid){$("seErr").textContent=lang==="bn"?"সঠিক NHR ID (যেমন NHR-XXXXXXXXX) অথবা ১৬ সংখ্যার NID দিন।":"Enter a valid NHR ID (e.g. NHR-XXXXXXXXX) or 16-digit NID.";return}
   $("seBtn").disabled=true;const r=await api("/api/doctor/search",{nhrId:n});$("seBtn").disabled=false;
   if(!r.ok){found=null;method="";render();$("seErr").textContent=r.status===404?t("nf"):t("srvErr");return}
   found=r.data.patient;method="";stopPoll();stopCd();$("vbody").dataset.dr="";addRecent(found);render();
@@ -801,7 +871,7 @@ async function startFp(){
 async function sendOtp(){
   vErr();$("otpSend").disabled=true;
   const r=await api("/api/doctor/verify/otp-send",{nhrId:found.nhrId});
-  if(!r.ok){$("otpSend").disabled=false;return vErr(t(r.data&&r.data.error==="wait"?"wait":"srvErr"))}
+  if(!r.ok){$("otpSend").disabled=false;const er=r.data&&r.data.error;if(er==="noEmail")return vErr(lang==="bn"?"এই রোগীর অ্যাকাউন্টে কোনো ইমেইল যুক্ত নেই।":"No email address found on this patient's account.");if(er==="mailFail")return vErr(lang==="bn"?"সার্ভার থেকে ইমেইল পাঠানো যায়নি। Render-এ EMAIL_USER ও EMAIL_PASS সেট করা আছে কিনা দেখুন।":"Could not send OTP email. Check EMAIL_USER and EMAIL_PASS on Render.");return vErr(t(er==="wait"?"wait":"srvErr"))}
   toast(t("otpSent"));
   
   const docName=D?D.name:t("docFallback");
@@ -838,7 +908,7 @@ function parseQr(text){
     }catch(e){}
     return null;
   }
-  const m=raw.match(/NHR:?\s*(\d{12})/i)||raw.match(/^\s*(\d{12}|\d{16})\s*$/);
+  const m=raw.match(/(NHR-[A-Z0-9]{6,12})/i)||raw.match(/NHR:?\s*(\d{12})/i)||raw.match(/^\s*(\d{12}|\d{16})\s*$/);
   return m?{id:m[1]}:null;
 }
 function showOffline(o){

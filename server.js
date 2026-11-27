@@ -591,44 +591,84 @@ app.post("/api/doctor/search", (req, res) => {
   res.json({ ok: true, patient: { nhrId: p.nhrId, maskedName: maskName(p.fullName), age: ageOf(p.dob), gender: p.gender[0], phoneEnd: p.phone.slice(-2), bloodGroup: p.bloodGroup, emergency: p.emergency } });
 });
 
+function resolveDocCtx(req) {
+  const sesDoc = docSes(req);
+  if (sesDoc) return sesDoc;
+  const fbd = req.body && req.body.fbDoctor;
+  if (fbd && (fbd.uid || fbd.bmdc)) {
+    const docId = s(fbd.bmdc || fbd.uid);
+    return {
+      token: "fb_" + s(fbd.uid || fbd.bmdc),
+      u: {
+        nhrId: docId,
+        fullName: s(fbd.name || "Doctor"),
+        doctor: {
+          license: s(fbd.bmdc || "DOC"),
+          hospital: s(fbd.hospital || "Hospital"),
+          speciality: s(fbd.specialty || "General Medicine")
+        }
+      }
+    };
+  }
+  return null;
+}
+
+function resolvePatientCtx(req) {
+  const fbp = req.body && req.body.fbPatient;
+  if (fbp) {
+    const u = ensureFb(fbp);
+    if (u) {
+      if (fbp.phone) u.phone = s(fbp.phone);
+      if (fbp.prefs) u.prefs = fbp.prefs;
+      save();
+      return u;
+    }
+  }
+  return patientOf(req.body && req.body.nhrId);
+}
+
 app.post("/api/doctor/verify/fp-start", (req, res) => {
-  const d = docSes(req); if (!d) return bad(res, "noSession", 401);
-  const p = patientOf(req.body && req.body.nhrId); if (!p) return bad(res, "nf", 404);
+  const d = resolveDocCtx(req); if (!d) return bad(res, "noSession", 401);
+  const p = resolvePatientCtx(req); if (!p) return bad(res, "nf", 404);
   const creds = db.credentials.filter((c) => c.userId === p.nhrId);
   if (!creds.length) return bad(res, "fpNone", 404);
-  const cred = creds.find((c) => c.rpId === rpHostOf(req));
-  if (!cred) return bad(res, "fpOtherHost", 409);
-  const t = newTicket({ purpose: "login", userId: p.nhrId, name: p.fullName, credentialId: cred.credentialId, pollKey: rand(16).toString("hex"), lang: "en", doctorToken: d.token });
+  const hostCreds = creds.filter((c) => c.rpId === rpHostOf(req));
+  if (!hostCreds.length) return bad(res, "fpOtherHost", 409);
+  const t = newTicket({ purpose: "login", userId: p.nhrId, name: p.fullName, credentialId: hostCreds[0].credentialId, credentialIds: hostCreds.map(c => c.credentialId), pollKey: rand(16).toString("hex"), lang: "en", doctorToken: d.token, fbDoc: d.u });
   res.json({ ok: true, requestId: t.id, qrUrl: baseOf(req) + "/m.html?t=" + t.id });
 });
 
 app.get("/api/doctor/verify/fp-status", (req, res) => {
-  const d = docSes(req); if (!d) return bad(res, "noSession", 401);
+  const d = docSes(req) || (req.query.dt ? { token: "fb_" + s(req.query.dt), u: null } : null);
+  if (!d) return bad(res, "noSession", 401);
   const t = getTicket(s(req.query.id));
   if (!t || t.doctorToken !== d.token) return res.json({ status: "denied" });
   if (t.status !== "approved") return res.json({ status: "pending" });
   tickets.delete(t.id);
   const p = patientOf(t.userId); if (!p) return res.json({ status: "denied" });
-  res.json(Object.assign({ status: "approved" }, grantFor(d.u, p, "full", "fp", 15)));
+  const docUser = d.u || t.fbDoc || { nhrId: "DOC", fullName: "Doctor" };
+  res.json(Object.assign({ status: "approved" }, grantFor(docUser, p, "full", "fp", 15)));
 });
 
-// Doctor OTP Verification with Gmail Fallback
+// Doctor OTP Verification with Real Gmail Delivery
 app.post("/api/doctor/verify/otp-send", async (req, res) => {
-  const d = docSes(req); if (!d) return bad(res, "noSession", 401);
-  const p = patientOf(req.body && req.body.nhrId); if (!p) return bad(res, "nf", 404);
+  const d = resolveDocCtx(req); if (!d) return bad(res, "noSession", 401);
+  const p = resolvePatientCtx(req); if (!p) return bad(res, "nf", 404);
+  if (!p.email) return bad(res, "noEmail", 400);
   const key = d.token + "|" + p.nhrId, o = otps.get(key);
   if (o && Date.now() - o.sentAt < 30000) return bad(res, "wait", 429);
   const code = String(crypto.randomInt(100000, 1000000));
   otps.set(key, { code, exp: Date.now() + 5 * 60000, tries: 0, sentAt: Date.now() });
-  console.log("[OTP Code] to " + p.phone + ": " + code);
+  console.log("[OTP Code] to " + p.email + ": " + code);
 
-  if (p.email) sendOtpEmail(p.email, p.fullName, code);
+  const sent = await sendOtpEmail(p.email, p.fullName, code);
+  if (!sent) { otps.delete(key); return bad(res, "mailFail", 500); }
   res.json({ ok: true });
 });
 
 app.post("/api/doctor/verify/otp-verify", (req, res) => {
-  const d = docSes(req); if (!d) return bad(res, "noSession", 401);
-  const p = patientOf(req.body && req.body.nhrId); if (!p) return bad(res, "nf", 404);
+  const d = resolveDocCtx(req); if (!d) return bad(res, "noSession", 401);
+  const p = resolvePatientCtx(req); if (!p) return bad(res, "nf", 404);
   const key = d.token + "|" + p.nhrId, o = otps.get(key), code = s(req.body && req.body.code);
   if (!o || o.exp < Date.now()) return bad(res, "badOtp", 400);
   if (++o.tries > 5) { otps.delete(key); return bad(res, "badOtp", 429); }
@@ -637,17 +677,17 @@ app.post("/api/doctor/verify/otp-verify", (req, res) => {
   res.json(grantFor(d.u, p, "full", "otp", 15));
 });
 
-// Doctor Emergency Access with Email Alert
-app.post("/api/doctor/verify/emergency", (req, res) => {
-  const d = docSes(req); if (!d) return bad(res, "noSession", 401);
-  const p = patientOf(req.body && req.body.nhrId); if (!p) return bad(res, "nf", 404);
+// Doctor Emergency Access with Real Gmail Alert
+app.post("/api/doctor/verify/emergency", async (req, res) => {
+  const d = resolveDocCtx(req); if (!d) return bad(res, "noSession", 401);
+  const p = resolvePatientCtx(req); if (!p) return bad(res, "nf", 404);
   const reason = s(req.body && req.body.reason), note = s(req.body && req.body.note);
   if (!["unconscious", "lifethreat", "noconsent", "other"].includes(reason) || note.length < 15) return bad(res, "emShort");
   if (p.prefs && p.prefs.em === false) return bad(res, "emOff", 403);
 
-  const timeNow = new Date().toLocaleString();
+  const timeNow = new Date().toLocaleString("en-US", { timeZone: "Asia/Dhaka" });
   console.log(`[EMERGENCY OVERRIDE] Doctor ${d.u.doctor.license} opened patient ${p.nhrId} at ${timeNow}`);
-  if (p.email) sendEmergencyAlertEmail(p.email, p.fullName, d.u.fullName, d.u.doctor.hospital, note, timeNow);
+  if (p.email) await sendEmergencyAlertEmail(p.email, p.fullName, d.u.fullName, d.u.doctor.hospital, note, timeNow);
 
   res.json(grantFor(d.u, p, "emergency", "em", 30, { reason, note: note.slice(0, 500) }));
 });
