@@ -15,14 +15,50 @@ process.on("unhandledRejection", (e) => console.error("Unhandled error:", e));
 const PORT = process.env.PORT || 5000;
 const PUBLIC_URL = (process.env.PUBLIC_URL || "").replace(/\/+$/, "");
 
-// Gmail Nodemailer Transporter
+// Gmail Transporter (HTTPS Apps Script Webhook + SMTP Fallback with strict timeout)
 const transporter = nodemailer.createTransport({
   service: "gmail",
+  connectionTimeout: 6000,
+  greetingTimeout: 6000,
+  socketTimeout: 6000,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
 });
+
+async function deliverEmail({ to, subject, html }) {
+  if (!to) return false;
+  const webhook = s(process.env.GMAIL_WEBHOOK_URL);
+  if (webhook) {
+    try {
+      const r = await fetch(webhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to, subject, html }),
+      });
+      const txt = await r.text();
+      if (r.ok && /ok/i.test(txt)) return true;
+      console.error("❌ Gmail Webhook Error:", r.status, txt);
+      return false;
+    } catch (err) {
+      console.error("❌ Gmail Webhook Fetch Error:", err.message || err);
+      return false;
+    }
+  }
+  try {
+    await transporter.sendMail({
+      from: `"NHR BD Portal" <${process.env.EMAIL_USER}>`,
+      to,
+      subject,
+      html,
+    });
+    return true;
+  } catch (err) {
+    console.error("❌ SMTP Email Error:", err.message || err);
+    return false;
+  }
+}
 
 const ADMINS = [
   { id: "ADM00000001", name: "Admin", password: "Admin@0001" }
@@ -100,20 +136,14 @@ async function sendOtpEmail(toEmail, patientName, otpCode) {
       </div>
     `
   };
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log(`✅ OTP email sent to ${toEmail}`);
-    return true;
-  } catch (err) {
-    console.error("❌ Email Error:", err.message || err);
-    return false;
-  }
+  const ok = await deliverEmail({ to: mailOptions.to, subject: mailOptions.subject, html: mailOptions.html });
+  if (ok) console.log(`✅ OTP email sent to ${toEmail}`);
+  return ok;
 }
 
 async function sendEmergencyAlertEmail(toEmail, patientName, doctorName, hospitalName, reason, timestamp) {
   if (!toEmail) return false;
   const mailOptions = {
-    from: `"NHR BD Alert System" <${process.env.EMAIL_USER}>`,
     to: toEmail,
     subject: `🚨 [EMERGENCY ACCESS ALERT] Medical Record Accessed!`,
     html: `
@@ -133,14 +163,9 @@ async function sendEmergencyAlertEmail(toEmail, patientName, doctorName, hospita
       </div>
     `
   };
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log(`🚨 Emergency Alert email sent to ${toEmail}`);
-    return true;
-  } catch (err) {
-    console.error("❌ Email Error:", err.message || err);
-    return false;
-  }
+  const ok = await deliverEmail({ to: mailOptions.to, subject: mailOptions.subject, html: mailOptions.html });
+  if (ok) console.log(`🚨 Emergency Alert email sent to ${toEmail}`);
+  return ok;
 }
 
 /* ---------- App Initialization ---------- */
@@ -687,7 +712,10 @@ app.post("/api/doctor/verify/emergency", async (req, res) => {
 
   const timeNow = new Date().toLocaleString("en-US", { timeZone: "Asia/Dhaka" });
   console.log(`[EMERGENCY OVERRIDE] Doctor ${d.u.doctor.license} opened patient ${p.nhrId} at ${timeNow}`);
-  if (p.email) await sendEmergencyAlertEmail(p.email, p.fullName, d.u.fullName, d.u.doctor.hospital, note, timeNow);
+  if (p.email) {
+    const sent = await sendEmergencyAlertEmail(p.email, p.fullName, d.u.fullName, d.u.doctor.hospital, note, timeNow);
+    if (!sent) return bad(res, "mailFail", 500);
+  }
 
   res.json(grantFor(d.u, p, "emergency", "em", 30, { reason, note: note.slice(0, 500) }));
 });

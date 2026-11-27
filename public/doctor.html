@@ -532,6 +532,15 @@ function clearSession(){
   try{sessionStorage.removeItem("nhr_doc_recent");localStorage.removeItem("nhr_doc_recent")}catch(e){}
 }
 
+/* ===== Wake Render backend & Fetch with timeout ===== */
+fetch("/api/me").catch(() => {});
+async function fetchWithTimeout(u, opts, ms = 45000) {
+  const ctrl = new AbortController();
+  const id = setTimeout(() => ctrl.abort(), ms);
+  try { return await fetch(u, Object.assign({}, opts || {}, { signal: ctrl.signal })); }
+  finally { clearTimeout(id); }
+}
+
 /* ===== Firebase Integration for API ===== */
 async function api(url, body, method, access) {
   try {
@@ -592,7 +601,7 @@ async function api(url, body, method, access) {
 
     // ২. আসল ব্যাকএন্ডের মাধ্যমে QR স্ক্যান, Gmail OTP এবং Emergency Override
     if (url.includes("fp-start")) {
-      const res = await fetch("/api/doctor/verify/fp-start", {
+      const res = await fetchWithTimeout("/api/doctor/verify/fp-start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nhrId: body.nhrId, fbPatient: fbPatientPayload(), fbDoctor: fbDoctorPayload() })
@@ -602,7 +611,7 @@ async function api(url, body, method, access) {
     }
     if (url.includes("fp-status")) {
       const sep = url.includes("?") ? "&" : "?";
-      const res = await fetch(url + sep + "dt=" + encodeURIComponent(fbDoctorPayload().uid));
+      const res = await fetchWithTimeout(url + sep + "dt=" + encodeURIComponent(fbDoctorPayload().uid));
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.status === "approved" && currentUser && found) {
         try {
@@ -612,7 +621,7 @@ async function api(url, body, method, access) {
       return { ok: res.ok, status: res.status, data };
     }
     if (url.includes("otp-send")) {
-      const res = await fetch("/api/doctor/verify/otp-send", {
+      const res = await fetchWithTimeout("/api/doctor/verify/otp-send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nhrId: body.nhrId, fbPatient: fbPatientPayload(), fbDoctor: fbDoctorPayload() })
@@ -621,7 +630,7 @@ async function api(url, body, method, access) {
       return { ok: res.ok, status: res.status, data };
     }
     if (url.includes("otp-verify")) {
-      const res = await fetch("/api/doctor/verify/otp-verify", {
+      const res = await fetchWithTimeout("/api/doctor/verify/otp-verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nhrId: body.nhrId, code: body.code, fbPatient: fbPatientPayload(), fbDoctor: fbDoctorPayload() })
@@ -635,7 +644,7 @@ async function api(url, body, method, access) {
       return { ok: res.ok, status: res.status, data };
     }
     if (url.includes("emergency")) {
-      const res = await fetch("/api/doctor/verify/emergency", {
+      const res = await fetchWithTimeout("/api/doctor/verify/emergency", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nhrId: body.nhrId, reason: body.reason, note: body.note, fbPatient: fbPatientPayload(), fbDoctor: fbDoctorPayload() })
@@ -892,7 +901,7 @@ async function emergency(){
   const note=$("emN").value.trim();vErr();
   if(note.length<15)return vErr(t("emShort"));if(!$("emC").checked)return vErr(t("emTick"));
   $("emGo").disabled=true;const r=await api("/api/doctor/verify/emergency",{nhrId:found.nhrId,reason:$("emR").value,note});$("emGo").disabled=false;
-  if(!r.ok)return vErr(t(r.data&&r.data.error==="emOff"?"emOff":"srvErr"));openPatient(r.data);
+  if(!r.ok){const er=r.data&&r.data.error;if(er==="mailFail")return vErr(lang==="bn"?"ইমেইল অ্যালার্ট পাঠানো যায়নি। Render-এ GMAIL_WEBHOOK_URL সেট করা আছে কিনা দেখুন।":"Could not send alert email. Check GMAIL_WEBHOOK_URL on Render.");return vErr(t(er==="emOff"?"emOff":"srvErr"));}openPatient(r.data);
 }
 
 /* ===== QR scanner ===== */
