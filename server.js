@@ -408,22 +408,243 @@ function getTicket(id) {
 }
 const goodPoll = (v) => typeof v === "string" && /^[a-f0-9]{16,64}$/.test(v);
 
-function ensureFb(f){if(!f)return null;const nid=String(f.nid||"").replace(/\D/g,""),nhrId=s(f.nhrId),uid=s(f.uid);if(!/^\d{16}$/.test(nid)&&!nhrId&&!uid)return null;let u=db.users.find(v=>(/^\d{16}$/.test(nid)&&v.nid===nid)||(nhrId&&v.nhrId===nhrId)||(uid&&v.uid===uid));if(!u){u={nhrId:nhrId||"NHR-"+Math.random().toString(36).slice(2,11).toUpperCase(),nid:/^\d{16}$/.test(nid)?nid:"",fullName:s(f.fullName)||"NHR User",email:s(f.email),uid,patientActive:true};db.users.push(u)}else{if(/^\d{16}$/.test(nid)&&!u.nid)u.nid=nid;if(uid)u.uid=uid;if(f.email)u.email=s(f.email);if(f.fullName)u.fullName=s(f.fullName)}if(typeof save==="function")save();return u}
-app.post("/api/fp/ticket",(req,res)=>{const{nid,key,pollKey,lang,fbUser}=req.body||{};if(!goodPoll(pollKey))return bad(res,"serverErr",403);let u=fbUser?ensureFb(fbUser):null;if(!u){const k=enrollKeys.get(s(nid));if(!k||k.exp<Date.now()||k.key!==key)return bad(res,"serverErr",403);u=db.users.find(v=>v.nid===s(nid))}if(!u)return bad(res,"noUser",404);const t=newTicket({purpose:"enroll",userId:u.nhrId,name:u.fullName,pollKey,lang:lang==="bn"?"bn":"en"});res.json({ticket:t.id,base:baseOf(req)})});
+const FB_PROJECT = process.env.FIREBASE_PROJECT_ID || "nhrbd-c7a6b";
+const FB_API_KEY = process.env.FIREBASE_API_KEY || "AIzaSyCNmHN7WJIL8c5ZIssV3-2wrYGXTFm_qjk";
+let fbCredsLoadedAt = 0;
 
-app.post("/api/fp/session-ticket",(req,res)=>{const{pollKey,lang,fbUser}=req.body||{};if(!goodPoll(pollKey))return bad(res,"serverErr");let u=fbUser?ensureFb(fbUser):null;if(!u){const x=getSes(req);if(!x||x.type!=="nid")return bad(res,"noSession",401);u=db.users.find(v=>v.nhrId===x.nhrId)}if(!u)return bad(res,"noUser",404);const t=newTicket({purpose:"enroll",userId:u.nhrId,name:u.fullName,pollKey,lang:lang==="bn"?"bn":"en"});res.json({ticket:t.id,base:baseOf(req)})});
+function fbHttp(method, pathAndQuery, bodyObj) {
+  return new Promise((resolve) => {
+    const data = bodyObj ? JSON.stringify(bodyObj) : null;
+    const req = https.request({
+      hostname: "firestore.googleapis.com",
+      port: 443,
+      path: "/v1/projects/" + FB_PROJECT + "/databases/(default)/documents" + pathAndQuery + (pathAndQuery.includes("?") ? "&" : "?") + "key=" + FB_API_KEY,
+      method,
+      family: 4,
+      timeout: 8000,
+      headers: data ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(data) } : {}
+    }, (res) => {
+      let body = "";
+      res.on("data", (c) => body += c);
+      res.on("end", () => {
+        try { resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, data: JSON.parse(body || "{}") }); }
+        catch (e) { resolve({ ok: false, status: res.statusCode, data: {} }); }
+      });
+    });
+    req.on("timeout", () => { req.destroy(); resolve({ ok: false, status: 408, data: {} }); });
+    req.on("error", () => resolve({ ok: false, status: 0, data: {} }));
+    if (data) req.write(data);
+    req.end();
+  });
+}
 
-app.post("/api/fp/login-ticket",(req,res)=>{if(req.body&&req.body.fbUser)ensureFb(req.body.fbUser);
+async function fbSaveCred(cred, fbUid) {
+  const safeDocId = String(cred.credentialId || "").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 120);
+  if (safeDocId) {
+    await fbHttp("PATCH", "/fp_credentials/" + encodeURIComponent(safeDocId), {
+      fields: {
+        userId: { stringValue: String(cred.userId || "") },
+        userKey: { stringValue: String(cred.userKey || "") },
+        nid: { stringValue: String(cred.nid || "") },
+        bmdc: { stringValue: String(cred.bmdc || "") },
+        uid: { stringValue: String(cred.uid || fbUid || "") },
+        role: { stringValue: String(cred.role || "patient") },
+        credentialId: { stringValue: String(cred.credentialId || "") },
+        publicKey: { stringValue: String(cred.publicKey || "") },
+        alg: { integerValue: String(Number(cred.alg || -7)) },
+        rpId: { stringValue: String(cred.rpId || "") },
+        createdAt: { stringValue: String(cred.createdAt || new Date().toISOString()) }
+      }
+    });
+  }
+  const targetUid = String(fbUid || cred.uid || "");
+  if (targetUid) {
+    await fbHttp("PATCH", "/users/" + encodeURIComponent(targetUid) + "?updateMask.fieldPaths=hasFingerprint&updateMask.fieldPaths=fpCredentialJson", {
+      fields: {
+        hasFingerprint: { booleanValue: true },
+        fpCredentialJson: { stringValue: JSON.stringify(cred) }
+      }
+    });
+  }
+}
+
+async function fbLoadCreds(force = false) {
+  if (!force && Date.now() - fbCredsLoadedAt < 20000 && db.credentials.length > 0) return;
+  const r = await fbHttp("GET", "/fp_credentials?pageSize=500");
+  fbCredsLoadedAt = Date.now();
+  if (!r.ok || !Array.isArray(r.data.documents)) return;
+  let changed = false;
+  for (const doc of r.data.documents) {
+    const f = doc.fields || {};
+    const credentialId = f.credentialId && f.credentialId.stringValue;
+    const publicKey = f.publicKey && f.publicKey.stringValue;
+    if (!credentialId || !publicKey) continue;
+    const item = {
+      userId: (f.userId && f.userId.stringValue) || "",
+      userKey: (f.userKey && f.userKey.stringValue) || "",
+      nid: (f.nid && f.nid.stringValue) || "",
+      bmdc: (f.bmdc && f.bmdc.stringValue) || "",
+      uid: (f.uid && f.uid.stringValue) || "",
+      role: (f.role && f.role.stringValue) || "patient",
+      credentialId,
+      publicKey,
+      alg: Number((f.alg && (f.alg.integerValue || f.alg.doubleValue)) || -7),
+      rpId: (f.rpId && f.rpId.stringValue) || "",
+      createdAt: (f.createdAt && f.createdAt.stringValue) || new Date().toISOString()
+    };
+    const idx = db.credentials.findIndex((c) => c.credentialId === credentialId);
+    if (idx === -1) { db.credentials.push(item); changed = true; }
+    else { db.credentials[idx] = Object.assign(db.credentials[idx], item); }
+  }
+  if (changed && typeof save === "function") save();
+}
+setTimeout(() => fbLoadCreds(true).catch(() => {}), 1500);
+
+function hydrateCredList(list) {
+  if (!Array.isArray(list)) return;
+  let changed = false;
+  for (const c of list) {
+    if (!c || !c.credentialId || !c.publicKey) continue;
+    if (!db.credentials.some((x) => x.credentialId === c.credentialId)) {
+      db.credentials.push({
+        userId: s(c.userId),
+        userKey: s(c.userKey),
+        nid: s(c.nid),
+        bmdc: s(c.bmdc),
+        uid: s(c.uid),
+        role: s(c.role || "patient"),
+        credentialId: s(c.credentialId),
+        publicKey: s(c.publicKey),
+        alg: Number(c.alg || -7),
+        rpId: s(c.rpId),
+        createdAt: s(c.createdAt || new Date().toISOString())
+      });
+      changed = true;
+    }
+  }
+  if (changed && typeof save === "function") save();
+}
+
+function matchUserCreds(user) {
+  return db.credentials.filter((c) =>
+    (user.nhrId && c.userId === user.nhrId) ||
+    (user.nid && (c.nid === user.nid || c.userKey === user.nid)) ||
+    (user.bmdc && (c.bmdc === user.bmdc || c.userId === user.bmdc || c.userKey === user.bmdc)) ||
+    (user.uid && c.uid === user.uid)
+  );
+}
+
+function ensureFb(f) {
+  if (!f) return null;
+  const nid = String(f.nid || "").replace(/\D/g, "");
+  const bmdc = s(f.bmdc).toUpperCase();
+  const nhrId = s(f.nhrId);
+  const uid = s(f.uid);
+  const isDoc = f.role === "doctor" || /^DOC/i.test(bmdc) || /^DOC/i.test(nhrId);
+  if (!/^\d{16}$/.test(nid) && !bmdc && !nhrId && !uid) return null;
+  let u = db.users.find((v) =>
+    (/^\d{16}$/.test(nid) && v.nid === nid) ||
+    (bmdc && (v.bmdc === bmdc || v.nhrId === bmdc)) ||
+    (nhrId && v.nhrId === nhrId) ||
+    (uid && v.uid === uid)
+  );
+  const stableId = nhrId || (isDoc && bmdc ? bmdc : (/^\d{16}$/.test(nid) ? "NHR-" + nid.slice(-9) : "NHR-" + (uid || Math.random().toString(36).slice(2, 11)).slice(0, 9).toUpperCase()));
+  if (!u) {
+    u = {
+      nhrId: stableId,
+      nid: /^\d{16}$/.test(nid) ? nid : "",
+      bmdc: bmdc || (isDoc ? stableId : ""),
+      role: isDoc ? "doctor" : "patient",
+      fullName: s(f.fullName) || (isDoc ? "Doctor" : "NHR User"),
+      email: s(f.email),
+      uid,
+      patientActive: true
+    };
+    if (isDoc) u.doctor = { license: u.bmdc, hospital: s(f.hospital || "Hospital"), speciality: s(f.specialty || "General Medicine"), status: "verified" };
+    db.users.push(u);
+  } else {
+    if (/^\d{16}$/.test(nid) && !u.nid) u.nid = nid;
+    if (bmdc && !u.bmdc) u.bmdc = bmdc;
+    if (isDoc) {
+      u.role = "doctor";
+      u.doctor = Object.assign({ license: u.bmdc || stableId, hospital: "Hospital", speciality: "General Medicine", status: "verified" }, u.doctor || {});
+    }
+    if (uid) u.uid = uid;
+    if (f.email) u.email = s(f.email);
+    if (f.fullName) u.fullName = s(f.fullName);
+  }
+  if (f.fpCreds) hydrateCredList(f.fpCreds);
+  if (typeof save === "function") save();
+  return u;
+}
+
+app.post("/api/fp/ticket", (req, res) => {
+  const { nid, key, pollKey, lang, fbUser } = req.body || {};
+  if (!goodPoll(pollKey)) return bad(res, "serverErr", 403);
+  let u = fbUser ? ensureFb(fbUser) : null;
+  if (!u) {
+    const k = enrollKeys.get(s(nid));
+    if (!k || k.exp < Date.now() || k.key !== key) return bad(res, "serverErr", 403);
+    u = db.users.find((v) => v.nid === s(nid));
+  }
+  if (!u) return bad(res, "noUser", 404);
+  const t = newTicket({ purpose: "enroll", userId: u.nhrId, nid: u.nid || "", bmdc: u.bmdc || "", fbUid: u.uid || "", role: u.role || "patient", name: u.fullName, pollKey, lang: lang === "bn" ? "bn" : "en" });
+  res.json({ ticket: t.id, base: baseOf(req) });
+});
+
+app.post("/api/fp/session-ticket", (req, res) => {
+  const { pollKey, lang, fbUser } = req.body || {};
+  if (!goodPoll(pollKey)) return bad(res, "serverErr");
+  let u = fbUser ? ensureFb(fbUser) : null;
+  if (!u) {
+    const x = getSes(req);
+    if (!x) return bad(res, "noSession", 401);
+    u = db.users.find((v) => v.nhrId === x.nhrId);
+  }
+  if (!u) return bad(res, "noUser", 404);
+  const t = newTicket({ purpose: "enroll", userId: u.nhrId, nid: u.nid || "", bmdc: u.bmdc || "", fbUid: u.uid || "", role: u.role || "patient", name: u.fullName, pollKey, lang: lang === "bn" ? "bn" : "en" });
+  res.json({ ticket: t.id, base: baseOf(req) });
+});
+
+app.post("/api/fp/login-ticket", async (req, res) => {
+  if (req.body && req.body.fbUser) ensureFb(req.body.fbUser);
+  if (req.body && req.body.fbCreds) hydrateCredList(req.body.fbCreds);
   const { id, pollKey, lang } = req.body || {};
-  if (!/^\d{16}$/.test(s(id)) || !goodPoll(pollKey)) return bad(res, "fpNidOnly");
-  const user = db.users.find((u) => u.nid === s(id));
+  const cleanId = s(id).toUpperCase();
+  const isNid = /^\d{16}$/.test(cleanId);
+  const isDoc = /^DOC[A-Z0-9-]+$/i.test(cleanId);
+  if ((!isNid && !isDoc) || !goodPoll(pollKey)) return bad(res, "fpNidOnly");
+  let user = isDoc
+    ? db.users.find((u) => (u.bmdc && u.bmdc.toUpperCase() === cleanId) || (u.nhrId && u.nhrId.toUpperCase() === cleanId))
+    : db.users.find((u) => u.nid === cleanId);
+  let creds = user ? matchUserCreds(user) : [];
+  if (!creds.length) {
+    await fbLoadCreds(true);
+    if (!user) {
+      user = isDoc
+        ? db.users.find((u) => (u.bmdc && u.bmdc.toUpperCase() === cleanId) || (u.nhrId && u.nhrId.toUpperCase() === cleanId))
+        : db.users.find((u) => u.nid === cleanId);
+    }
+    creds = user ? matchUserCreds(user) : [];
+  }
   if (!user) return bad(res, "noUser", 404);
   if (user.patientActive === false) return bad(res, "noPatient", 404);
-  const creds = db.credentials.filter((c) => c.userId === user.nhrId);
   if (!creds.length) return bad(res, "fpNone", 404);
-  const hostCreds = creds.filter((c) => c.rpId === rpHostOf(req));
+  const hostCreds = creds.filter((c) => !c.rpId || c.rpId === rpHostOf(req));
   if (!hostCreds.length) return bad(res, "fpOtherHost", 409);
-  const t = newTicket({ purpose: "login", userId: user.nhrId, name: user.fullName, credentialId: hostCreds[0].credentialId, credentialIds: hostCreds.map(c => c.credentialId), pollKey, lang: lang === "bn" ? "bn" : "en" });
+  const t = newTicket({
+    purpose: "login",
+    userId: user.nhrId,
+    nid: user.nid || "",
+    bmdc: user.bmdc || "",
+    fbUid: user.uid || "",
+    role: isDoc || user.role === "doctor" ? "doctor" : "patient",
+    name: user.fullName,
+    credentialId: hostCreds[0].credentialId,
+    credentialIds: hostCreds.map((c) => c.credentialId),
+    pollKey,
+    lang: lang === "bn" ? "bn" : "en"
+  });
   res.json({ ticket: t.id, base: baseOf(req) });
 });
 
@@ -436,7 +657,7 @@ app.get("/api/fp/ticket/:id", (req, res) => {
   });
 });
 
-app.post("/api/fp/ticket/:id/enroll", (req, res) => {
+app.post("/api/fp/ticket/:id/enroll", async (req, res) => {
   const t = getTicket(req.params.id);
   if (!t || t.purpose !== "enroll") return bad(res, "expired", 404);
   if (t.status !== "pending") return bad(res, "used", 409);
@@ -447,11 +668,25 @@ app.post("/api/fp/ticket/:id/enroll", (req, res) => {
     if (![-7, -257].includes(Number(b.alg)) || !b.rawId || !b.publicKey) return bad(res, "fpBad");
     crypto.createPublicKey({ key: b64u.dec(b.publicKey), format: "der", type: "spki" });
     const rpId = rpHostOf(req);
+    const credObj = {
+      userId: t.userId,
+      userKey: t.nid || t.bmdc || t.userId,
+      nid: t.nid || "",
+      bmdc: t.bmdc || "",
+      uid: t.fbUid || "",
+      role: t.role || "patient",
+      credentialId: b.rawId,
+      publicKey: b.publicKey,
+      alg: Number(b.alg),
+      rpId,
+      createdAt: new Date().toISOString()
+    };
     db.credentials = db.credentials.filter((c) => c.credentialId !== b.rawId);
-    db.credentials.push({ userId: t.userId, credentialId: b.rawId, publicKey: b.publicKey, alg: Number(b.alg), rpId, createdAt: new Date().toISOString() });
+    db.credentials.push(credObj);
     save();
+    await fbSaveCred(credObj, t.fbUid);
     t.status = "done";
-    res.json({ ok: true });
+    res.json({ ok: true, credential: credObj });
   } catch (err) { bad(res, "fpBad"); }
 });
 
@@ -462,7 +697,11 @@ app.post("/api/fp/ticket/:id/assert", (req, res) => {
   try {
     const b = req.body || {};
     const allowed = t.credentialIds || (t.credentialId ? [t.credentialId] : []);
-    const cred = db.credentials.find((c) => c.userId === t.userId && c.credentialId === b.credentialId && allowed.includes(b.credentialId));
+    const cred = db.credentials.find((c) =>
+      c.credentialId === b.credentialId &&
+      allowed.includes(b.credentialId) &&
+      (c.userId === t.userId || (t.nid && c.nid === t.nid) || (t.bmdc && c.bmdc === t.bmdc) || (t.fbUid && c.uid === t.fbUid))
+    );
     if (!cred) return bad(res, "fpBad");
     const cdRaw = b64u.dec(b.clientDataJSON);
     const cd = JSON.parse(cdRaw.toString("utf8"));
@@ -475,12 +714,20 @@ app.post("/api/fp/ticket/:id/assert", (req, res) => {
     const key = crypto.createPublicKey({ key: b64u.dec(cred.publicKey), format: "der", type: "spki" });
     if (!crypto.verify("sha256", signed, { key, dsaEncoding: "der" }, b64u.dec(b.signature))) return bad(res, "fpBad");
 
-    const user = db.users.find((u) => u.nhrId === t.userId);
+    const user = db.users.find((u) => u.nhrId === t.userId || (t.nid && u.nid === t.nid) || (t.bmdc && u.bmdc === t.bmdc)) || {
+      nhrId: t.userId, fullName: t.name, nid: t.nid || "", bmdc: t.bmdc || "", uid: t.fbUid || "", role: t.role || "patient"
+    };
     t.status = "approved";
     if (t.doctorToken) return res.json({ ok: true });
     reactivate(user);
-    t.token = makeSession({ type: "nid", name: user.fullName, nhrId: user.nhrId });
-    t.user = { type: "nid", name: user.fullName, nhrId:user.nhrId,uid:user.uid||"",email:user.email||"",nid:user.nid||""};
+    const isDoc = t.role === "doctor" || user.role === "doctor" || /^DOC/i.test(t.bmdc || user.bmdc || "");
+    if (isDoc) {
+      t.token = makeSession({ type: "doctor", name: user.fullName, nhrId: user.nhrId });
+      t.user = { type: "doctor", role: "doctor", name: user.fullName, nhrId: user.nhrId, bmdc: user.bmdc || t.bmdc || user.nhrId, uid: user.uid || t.fbUid || "", email: user.email || "" };
+    } else {
+      t.token = makeSession({ type: "nid", name: user.fullName, nhrId: user.nhrId });
+      t.user = { type: "nid", role: "patient", name: user.fullName, nhrId: user.nhrId, uid: user.uid || t.fbUid || "", email: user.email || "", nid: user.nid || t.nid || "" };
+    }
     res.json({ ok: true });
   } catch (err) { bad(res, "fpBad"); }
 });

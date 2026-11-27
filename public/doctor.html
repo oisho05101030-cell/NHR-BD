@@ -496,33 +496,56 @@ function toast(m){const e=$("toast");e.textContent=m;e.hidden=false;clearTimeout
 let currentUser = null;
 let D = { name: "Doctor", bmdc: "DOC0000", specialty: "General Medicine", hospital: "Hospital", degree: "MBBS", fee: "1000 BDT", schedule: "Sat-Wed", hasFingerprint: false };
 
+function readDocSession() {
+  for (const st of [sessionStorage, localStorage]) {
+    try {
+      const v = JSON.parse(st.getItem("nhr_session") || st.getItem("nhr_user") || "null");
+      if (v && v.role === "doctor") return v;
+    } catch (e) {}
+  }
+  return null;
+}
+
 auth.onAuthStateChanged(async (user) => {
-  if (!user && !DEMO) {
+  const fpSes = readDocSession();
+  if (!user && !fpSes && !DEMO) {
     location.replace("login.html");
     return;
   }
-  if (user) {
-    currentUser = user;
-    try {
-      const docSnap = await db.collection("users").doc(user.uid).get();
-      if (docSnap.exists) {
-        const uData = docSnap.data();
-        D = {
-          name: uData.fullName || "Dr. User",
-          bmdc: uData.bmdc || uData.nid || "DOC0001",
-          specialty: uData.specialty || "Medicine",
-          hospital: uData.hospital || "General Hospital",
-          degree: uData.degree || "MBBS",
-          fee: uData.fee || "1000 BDT",
-          schedule: uData.schedule || "Sat-Wed 5PM-9PM",
-          hasFingerprint: false
-        };
-        render();
-        loadAudit();
-        loadAppts();
-      }
-    } catch(e) { console.error("Profile load err:", e); }
-  }
+  const activeUid = (user && user.uid) || (fpSes && fpSes.uid) || "";
+  currentUser = user || (fpSes ? { uid: activeUid || ("fp_" + (fpSes.bmdc || "doc")), email: fpSes.email || "" } : null);
+  try {
+    let docSnap = null;
+    if (activeUid) {
+      const s = await db.collection("users").doc(activeUid).get();
+      if (s.exists) docSnap = s;
+    }
+    if (!docSnap && fpSes && fpSes.bmdc) {
+      const q = await db.collection("users").where("bmdc", "==", fpSes.bmdc).limit(1).get();
+      if (!q.empty) docSnap = q.docs[0];
+    }
+    if (docSnap) {
+      const uData = docSnap.data();
+      if (currentUser && !currentUser.uid) currentUser.uid = docSnap.id;
+      D = {
+        uid: docSnap.id,
+        name: uData.fullName || (fpSes && fpSes.name) || "Dr. User",
+        bmdc: uData.bmdc || uData.nid || (fpSes && fpSes.bmdc) || "DOC0001",
+        specialty: uData.specialty || "Medicine",
+        hospital: uData.hospital || "General Hospital",
+        degree: uData.degree || "MBBS",
+        fee: uData.fee || "1000 BDT",
+        schedule: uData.schedule || "Sat-Wed 5PM-9PM",
+        hasFingerprint: !!uData.hasFingerprint
+      };
+      render();
+      loadAudit();
+      loadAppts();
+    } else if (fpSes) {
+      D = Object.assign(D, { uid: activeUid, name: fpSes.name || "Dr. User", bmdc: fpSes.bmdc || "DOC0001", hasFingerprint: true });
+      render();
+    }
+  } catch(e) { console.error("Profile load err:", e); }
 });
 
 function clearSession(){
@@ -1130,7 +1153,37 @@ $("pwBtn").onclick=async()=>{
 $("lockSel").onchange=(e)=>{localStorage.setItem("nhr_doc_lock",e.target.value)};
 $("outAllBtn").onclick=async()=>{clearSession();location.href="login.html"};
 $("addFp").onclick=async()=>{
-  D.hasFingerprint=true;render();return toast(t("fpOk"));
+  const btn = $("addFp");
+  btn.disabled = true;
+  try {
+    const a = new Uint8Array(16); crypto.getRandomValues(a);
+    const pollKey = [...a].map(b => b.toString(16).padStart(2, "0")).join("");
+    const docUid = D.uid || (currentUser && currentUser.uid) || "";
+    const res = await fetchWithTimeout("/api/fp/session-ticket", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pollKey,
+        lang,
+        fbUser: { uid: docUid, bmdc: D.bmdc, nhrId: D.bmdc, fullName: D.name, email: (currentUser && currentUser.email) || "", role: "doctor" }
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ticket) { toast(t("fpFail")); return; }
+    const hasSensor = window.nhrHasSensor ? await window.nhrHasSensor() : false;
+    if (!hasSensor || !window.nhrDirectEnroll) { toast(t("fpNoSupport")); return; }
+    await window.nhrDirectEnroll(data.ticket, docUid);
+    D.hasFingerprint = true;
+    if (docUid) {
+      try { await db.collection("users").doc(docUid).update({ hasFingerprint: true }); } catch (e) {}
+    }
+    render();
+    toast(t("fpOk"));
+  } catch (e) {
+    toast(t("fpFail"));
+  } finally {
+    btn.disabled = false;
+  }
 };
 
 /* ===== Deactivate ===== */

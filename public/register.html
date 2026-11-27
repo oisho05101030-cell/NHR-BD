@@ -976,7 +976,7 @@
       }
     }
 
-    /* ================= QR code: save the fingerprint on the phone ================= */
+    /* ================= Biometric enroll: direct sensor on phone, QR on desktop ================= */
     async function startEnroll() {
       clearInterval(pollTimer);
       fpDone = false; $("fpStatus").className = "fp-status"; $("qrRetry").hidden = true;
@@ -985,20 +985,74 @@
       const r = await api("/api/fp/ticket", { nid: lastEnroll.nid, key: lastEnroll.key, fbUser: lastEnroll.fbUser, pollKey, lang });
       if (!r.ok) { $("fpStatusText").textContent = t(I18N.en[r.data.error] ? r.data.error : "serverErr"); return; }
 
-      $("qrcode").innerHTML = "";
-      new QRCode($("qrcode"), { text: r.data.base + "/m.html?t=" + r.data.ticket, width: 168, height: 168 });
-      $("fpWarn").hidden = /^https:\/\//.test(r.data.base);
+      const showQrFallback = () => {
+        const oldBox = $("directFpBox");
+        if (oldBox) oldBox.remove();
+        $("qrcode").hidden = false;
+        $("qrcode").innerHTML = "";
+        new QRCode($("qrcode"), { text: r.data.base + "/m.html?t=" + r.data.ticket, width: 168, height: 168 });
+        $("fpWarn").hidden = /^https:\/\//.test(r.data.base);
+        $("fpStatusText").textContent = t("waitingFp");
+        clearInterval(pollTimer);
+        pollTimer = setInterval(async () => {
+          const s = await api("/api/fp/ticket/" + r.data.ticket + "/status?k=" + pollKey, null, "GET");
+          if (s.data.status === "done") {
+            clearInterval(pollTimer); fpDone = true;
+            $("fpStatus").className = "fp-status done"; $("fpStatusText").textContent = t("fpSuccess");
+            try { if (window.db && lastEnroll.fbUser && lastEnroll.fbUser.uid) await window.db.collection("users").doc(lastEnroll.fbUser.uid).update({ hasFingerprint: true }); } catch (e) {}
+          } else if (s.data.status === "expired") {
+            clearInterval(pollTimer);
+            $("fpStatusText").textContent = t("fpExpired"); $("qrRetry").hidden = false;
+          }
+        }, 1500);
+      };
 
-      pollTimer = setInterval(async () => {
-        const s = await api("/api/fp/ticket/" + r.data.ticket + "/status?k=" + pollKey, null, "GET");
-        if (s.data.status === "done") {
-          clearInterval(pollTimer); fpDone = true;
-          $("fpStatus").className = "fp-status done"; $("fpStatusText").textContent = t("fpSuccess");try{if(window.db&&lastEnroll.fbUser&&lastEnroll.fbUser.uid)await window.db.collection("users").doc(lastEnroll.fbUser.uid).update({hasFingerprint:true})}catch(e){}
-        } else if (s.data.status === "expired") {
-          clearInterval(pollTimer);
-          $("fpStatusText").textContent = t("fpExpired"); $("qrRetry").hidden = false;
-        }
-      }, 1500);
+      const hasSensor = window.nhrHasSensor ? await window.nhrHasSensor() : false;
+      if (hasSensor && window.nhrDirectEnroll) {
+        $("qrcode").hidden = true;
+        $("fpWarn").hidden = true;
+        const container = $("qrContainer");
+        const heading = container.querySelector("h3, h4");
+        const desc = container.querySelector("p");
+        if (heading) heading.textContent = lang === "bn" ? "আপনার ফোনের ফিঙ্গারপ্রিন্ট সেভ করুন" : "Save your phone's fingerprint";
+        if (desc) desc.textContent = lang === "bn" ? "কোনো QR কোড ছাড়াই সরাসরি এই ডিভাইসের ফিঙ্গারপ্রিন্ট সেন্সর ব্যবহার করুন।" : "Use this device's built-in fingerprint sensor directly—no QR code needed.";
+
+        let box = $("directFpBox");
+        if (box) box.remove();
+        box = document.createElement("div");
+        box.id = "directFpBox";
+        box.style.cssText = "display:flex;flex-direction:column;align-items:center;gap:10px;margin:14px 0;";
+        box.innerHTML = '<button type="button" id="directFpBtn" class="btn" style="width:100%;max-width:280px;">' +
+          (lang === "bn" ? "👆 এখনই ফিঙ্গারপ্রিন্ট সেভ করুন" : "👆 Save Fingerprint Now") +
+          '</button><button type="button" id="useQrAltBtn" style="background:none;border:none;color:#0a7fc4;font-size:13px;text-decoration:underline;cursor:pointer;">' +
+          (lang === "bn" ? "অন্য ফোন দিয়ে QR স্ক্যান করুন" : "Scan QR with another phone instead") + '</button>';
+        $("qrcode").parentNode.insertBefore(box, $("qrcode"));
+
+        const runDirect = async () => {
+          const btn = $("directFpBtn");
+          if (btn) btn.disabled = true;
+          $("fpStatusText").textContent = lang === "bn" ? "ফোনের ফিঙ্গারপ্রিন্ট সেন্সরে আঙুল রাখুন..." : "Touch your phone's fingerprint sensor...";
+          try {
+            await window.nhrDirectEnroll(r.data.ticket, lastEnroll && lastEnroll.fbUser && lastEnroll.fbUser.uid);
+            clearInterval(pollTimer); fpDone = true;
+            if (box) box.remove();
+            $("fpStatus").className = "fp-status done";
+            $("fpStatusText").textContent = t("fpSuccess");
+            try { if (window.db && lastEnroll.fbUser && lastEnroll.fbUser.uid) await window.db.collection("users").doc(lastEnroll.fbUser.uid).update({ hasFingerprint: true }); } catch (e) {}
+          } catch (err) {
+            if (btn) btn.disabled = false;
+            $("fpStatusText").textContent = lang === "bn"
+              ? "উপরের বাটনে চেপে ফিঙ্গারপ্রিন্ট দিন, অথবা নিচের লিংকে চেপে QR স্ক্যান করুন।"
+              : "Tap the button above to trigger fingerprint, or switch to QR scan.";
+          }
+        };
+        $("directFpBtn").onclick = runDirect;
+        $("useQrAltBtn").onclick = showQrFallback;
+        runDirect();
+        return;
+      }
+
+      showQrFallback();
     }
     $("qrRetry").addEventListener("click", startEnroll);
 

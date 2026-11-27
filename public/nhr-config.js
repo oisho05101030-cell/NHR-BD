@@ -25,7 +25,7 @@
       return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
     } catch (e) { return false; }
   };
-  window.nhrDirectEnroll = async function (ticketId) {
+  window.nhrDirectEnroll = async function (ticketId, fbUid) {
     var r = await fetch("/api/fp/ticket/" + encodeURIComponent(ticketId));
     if (!r.ok) throw new Error("expired");
     var T = await r.json();
@@ -53,6 +53,15 @@
       })
     });
     if (!saveRes.ok) throw new Error("verify");
+    var savedData = await saveRes.json().catch(function () { return {}; });
+    if (window.db && fbUid && savedData.credential) {
+      try {
+        await window.db.collection("users").doc(fbUid).update({
+          hasFingerprint: true,
+          fpCredentialJson: JSON.stringify(savedData.credential)
+        });
+      } catch (e) {}
+    }
     return true;
   };
   window.nhrDirectAssert = async function (ticketId) {

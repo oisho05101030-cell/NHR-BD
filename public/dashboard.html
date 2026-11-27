@@ -1133,7 +1133,7 @@ $("addFp").onclick=async()=>{
       $("dashDirectFp").disabled = true;
       $("fpMsg").textContent = lang==="bn"?"সেন্সরে আঙুল রাখুন...":"Place your finger on the sensor...";
       try {
-        await window.nhrDirectEnroll(r.data.ticket);
+        await window.nhrDirectEnroll(r.data.ticket, P && P.uid);
         P.hasFingerprint = true;
         try { await db.collection("users").doc(P.uid || P.nhrId || P.nid).update({ hasFingerprint: true }); } catch(e){}
         closeModal(); render(); toast(t("fpOk"));
@@ -1198,30 +1198,71 @@ $("delBtn").onclick=()=>openModal({title:t("mDlTitle"),desc:t("mDlDesc"),go:t("d
 /* ===== Real-Time Firebase Auth & Sync Initialization ===== */
 /* ===== Real-Time Firebase Auth & Sync Initialization ===== */
 auth.onAuthStateChanged(async (user) => {
+  const activeSes = ses || readSession();
+
   if (user) {
     try {
       const doc = await db.collection("users").doc(user.uid).get();
       if (doc.exists) {
         P = doc.data();
         P.uid = user.uid;
-
-        // Normalize field structures
-        P.dob = P.dob || P.dateOfBirth || "";
-        P.bloodGroup = P.bloodGroup || P.health?.bloodGroup || "";
-        P.emergency = P.emergency || P.emergencyContact || { name: "", relation: "", phone: "" };
-        P.address = typeof P.address === "string" ? P.address : P.address?.details || "";
-        P.district = P.district || P.addressInfo?.district || "";
-        P.division = P.division || P.addressInfo?.division || "";
       }
     } catch(e) {
       console.error("User fetch error:", e);
     }
-  }
+  } else if (activeSes && activeSes.token) {
+    try {
+      const me = await api("/api/me", null, "GET");
+      if (me.ok && me.data) {
+        P = me.data.user || me.data;
+      } else if (me.status === 401) {
+        clearSession();
+        location.replace("login.html");
+        return;
+      }
+    } catch(e) {}
 
-  if (!user) {
+    try {
+      let docSnap = null;
+      if (activeSes.uid) {
+        const d = await db.collection("users").doc(activeSes.uid).get();
+        if (d.exists) docSnap = d;
+      }
+      if (!docSnap && activeSes.nid) {
+        const qSnap = await db.collection("users").where("nid", "==", activeSes.nid).limit(1).get();
+        if (!qSnap.empty) docSnap = qSnap.docs[0];
+      }
+      if (docSnap) {
+        P = { ...(P || {}), ...docSnap.data(), uid: docSnap.id };
+      }
+    } catch(e) {
+      console.error("Fallback user fetch error:", e);
+    }
+
+    if (!P) {
+      P = {
+        uid: activeSes.uid || "",
+        nid: activeSes.nid || "",
+        nhrId: activeSes.nhrId || "",
+        fullName: activeSes.name || "",
+        name: activeSes.name || "",
+        email: activeSes.email || "",
+        role: activeSes.role || "patient"
+      };
+    }
+  } else {
     clearSession();
     location.replace("login.html");
     return;
+  }
+
+  if (P) {
+    P.dob = P.dob || P.dateOfBirth || "";
+    P.bloodGroup = P.bloodGroup || P.health?.bloodGroup || "";
+    P.emergency = P.emergency || P.emergencyContact || { name: "", relation: "", phone: "" };
+    P.address = typeof P.address === "string" ? P.address : P.address?.details || "";
+    P.district = P.district || P.addressInfo?.district || "";
+    P.division = P.division || P.addressInfo?.division || "";
   }
 
   if (P) {
