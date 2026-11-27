@@ -758,12 +758,12 @@ async function _apiInner(url, body, method, access) {
     if (url.includes("/doctor/audit")) {
       const snap = await db.collection("access_logs").orderBy("when", "desc").limit(10).get();
       const logs = snap.docs.map(d => d.data());
-      return { ok: true, status: 200, data: { log: logs.length ? logs : [{ when: Date.now() - 36e5, nhrId: "0692410005101010", name: "Oisho Guda", method: "otp" }] } };
+      return { ok: true, status: 200, data: { log: logs } };
     }
     if (url.includes("/doctor/donors")) {
       const snap = await db.collection("users").where("role", "==", "donor").get();
       const donors = snap.docs.map(d => d.data());
-      return { ok: true, status: 200, data: { donors: donors.length ? donors : [{ name: "Sajid Ahmed", blood: body.blood || "B+", phone: "01711223344", area: "Dhaka" }] } };
+      return { ok: true, status: 200, data: { donors } };
     }
     if (url.includes("/doctor/appointments")) {
       return { ok: true, status: 200, data: { list: APPTS } };
