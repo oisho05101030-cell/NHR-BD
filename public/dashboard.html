@@ -150,6 +150,34 @@ h2{font-size:24px;font-weight:800;letter-spacing:-.02em;color:var(--navy)}.sub{m
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media(max-width:960px){.main{padding:18px 16px 60px}.grid2{grid-template-columns:minmax(0,1fr)}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.hello h1{font-size:22px}.row{flex-wrap:wrap}.kv{grid-template-columns:minmax(0,1fr)}.bd-form{grid-template-columns:1fr}.fgrid{grid-template-columns:1fr}.dn-card{flex-wrap:wrap}.act{margin:0;align-items:flex-start}}
 </style>
+<style id="nhr-responsive-fix">
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { max-width: 100%; overflow-x: hidden; -webkit-text-size-adjust: 100%; }
+  img, svg, canvas, video { max-width: 100%; }
+  h1, h2, h3, h4, p, span, label, a, td, th, li, small, strong, b { overflow-wrap: break-word; word-wrap: break-word; }
+  @media (max-width: 768px) {
+    .top, header, nav { height: auto !important; min-height: 60px; padding: 10px 14px !important; flex-wrap: wrap !important; gap: 8px !important; }
+    .hl, .hr, .nav-right, .nav-actions, .actions, .tabs, .pills { flex-wrap: wrap !important; gap: 8px !important; }
+    .wrap, .container, .shell, .page, .main, main, .card, .panel, .box, .mcard { width: 100% !important; max-width: 100% !important; }
+    .card, .panel, .mcard { padding: 20px 16px !important; border-radius: 18px !important; }
+    .grid, .grid2, .grid3, .grid4, .row2, .two-col, .three-col, .cols, .stats, .cards {
+      grid-template-columns: 1fr !important;
+      gap: 12px !important;
+    }
+    .idbox, .srow, .setting-row, .item-row, .list-row {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: 10px !important;
+    }
+    .idbox button, .srow button, .setting-row button { width: 100% !important; }
+    h1 { font-size: clamp(22px, 6vw, 28px) !important; line-height: 1.28 !important; }
+    h2 { font-size: clamp(19px, 5vw, 24px) !important; line-height: 1.3 !important; }
+    input, select, textarea { font-size: 16px !important; max-width: 100% !important; }
+    button, .btn { min-height: 44px; }
+    table { display: block; width: 100%; overflow-x: auto; }
+  }
+</style>
+<script src="nhr-config.js"></script>
 </head>
 
 <!-- Firebase Compat SDKs -->
@@ -1080,13 +1108,43 @@ $("editEmBtn").onclick=()=>{
 };
 
 $("addFp").onclick=async()=>{
-  const pollKey=randHex(16),r=await api("/api/fp/session-ticket",{pollKey,lang,fbUser:P?{uid:P.uid,nid:P.nid||P.nidNumber||P.identity?.nid||""||P.identity?.nid||"",fullName:P.fullName||P.name,email:P.email,nhrId:P.nhrId}:null});
+  const pollKey=randHex(16),r=await api("/api/fp/session-ticket",{pollKey,lang,fbUser:P?{uid:P.uid,nid:P.nid||P.nidNumber||P.identity?.nid||"",fullName:P.fullName||P.name,email:P.email,nhrId:P.nhrId}:null});
   if(!r.ok)return toast(errText(r.data.error));
   let timer=null;
-  openModal({title:t("qrTitle"),desc:t("qrDesc"),go:"OK",
-    body:'<div id="fpQr" style="display:grid;place-items:center;margin:10px 0"></div>'+(/^https:\/\//.test(r.data.base)?"":'<p class="hint" style="color:#6a5200">'+t("fpHttps")+"</p>")+'<p class="hint" id="fpMsg">'+t("waitPhone")+"</p>",
-    run:async()=>null,onClose:()=>clearInterval(timer)});
-  if(window.QRCode)new QRCode($("fpQr"),{text:r.data.base+"/m.html?t="+r.data.ticket,width:170,height:170,colorDark:"#0c3b5e"});
+  const hasSensor = window.nhrHasSensor ? await window.nhrHasSensor() : false;
+  const renderQr = () => {
+    const area = $("fpArea");
+    if (!area) return;
+    area.innerHTML = '<div id="fpQr" style="display:grid;place-items:center;margin:10px 0"></div>'+(/^https:\/\//.test(r.data.base)?"":'<p class="hint" style="color:#6a5200">'+t("fpHttps")+"</p>")+'<p class="hint" id="fpMsg">'+t("waitPhone")+"</p>";
+    if(window.QRCode)new QRCode($("fpQr"),{text:r.data.base+"/m.html?t="+r.data.ticket,width:170,height:170,colorDark:"#0c3b5e"});
+  };
+  openModal({
+    title: hasSensor ? (lang==="bn"?"এই ডিভাইসের ফিঙ্গারপ্রিন্ট যোগ করুন":"Add Fingerprint on This Device") : t("qrTitle"),
+    desc: hasSensor ? (lang==="bn"?"নিচের বাটনে চাপ দিয়ে আপনার ফোনের ফিঙ্গারপ্রিন্ট সেন্সর ব্যবহার করুন।":"Tap below to verify using this device's fingerprint sensor.") : t("qrDesc"),
+    go: "OK",
+    body: '<div id="fpArea"></div>',
+    run: async()=>null,
+    onClose: ()=>clearInterval(timer)
+  });
+  if (hasSensor && window.nhrDirectEnroll) {
+    $("fpArea").innerHTML = '<div style="text-align:center;padding:10px 0"><button type="button" id="dashDirectFp" style="width:100%;height:48px;border:none;border-radius:12px;background:#0a8fc7;color:#fff;font-weight:700;cursor:pointer;margin-bottom:10px">'+(lang==="bn"?"ফিঙ্গারপ্রিন্ট স্ক্যান করুন":"Scan Fingerprint Now")+'</button><button type="button" id="dashShowQr" style="background:none;border:none;color:#0a8fc7;font-weight:600;font-size:13px;cursor:pointer;text-decoration:underline">'+(lang==="bn"?"অন্য ফোনের QR কোড দেখান":"Show QR code for another phone")+'</button><p class="hint" id="fpMsg" style="margin-top:8px"></p></div>';
+    $("dashShowQr").onclick = renderQr;
+    $("dashDirectFp").onclick = async () => {
+      $("dashDirectFp").disabled = true;
+      $("fpMsg").textContent = lang==="bn"?"সেন্সরে আঙুল রাখুন...":"Place your finger on the sensor...";
+      try {
+        await window.nhrDirectEnroll(r.data.ticket);
+        P.hasFingerprint = true;
+        try { await db.collection("users").doc(P.uid || P.nhrId || P.nid).update({ hasFingerprint: true }); } catch(e){}
+        closeModal(); render(); toast(t("fpOk"));
+      } catch(e) {
+        $("dashDirectFp").disabled = false;
+        $("fpMsg").textContent = lang==="bn"?"আবার চেষ্টা করুন।":"Failed or cancelled. Try again.";
+      }
+    };
+  } else {
+    renderQr();
+  }
   timer=setInterval(async()=>{
     const s=await api("/api/fp/ticket/"+r.data.ticket+"/status?k="+pollKey);
     if(s.data.status==="done"){

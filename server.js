@@ -71,8 +71,9 @@ const bad = (res, error, code = 400, extra = {}) => res.status(code).json(Object
 const hostOf = (req) => String(req.get("x-forwarded-host") || req.get("host") || "").split(",")[0].trim();
 const isLocal = (h) => !h || /^localhost(?::|$)|^127\.0\.0\.1(?::|$)/.test(h);
 const originOf = (req) => { const h = hostOf(req); return !isLocal(h) ? (String(req.get("x-forwarded-proto") || "https").split(",")[0].trim() + "://" + h) : (PUBLIC_URL || "http://" + h); };
-const baseOf = (req) => originOf(req);
-const rpHostOf = (req) => new URL(originOf(req)).hostname;
+const clientOrigin = (req) => { const o = s(req.get("origin")); return /^https?:\/\/[a-z0-9.-]+(?::\d+)?$/i.test(o) ? o : originOf(req); };
+const baseOf = (req) => clientOrigin(req);
+const rpHostOf = (req) => new URL(clientOrigin(req)).hostname;
 
 function newNhrId() {
   let id;
@@ -144,6 +145,17 @@ async function sendEmergencyAlertEmail(toEmail, patientName, doctorName, hospita
 
 /* ---------- App Initialization ---------- */
 const app = express();
+app.use((req, res, next) => {
+  const origin = req.get("origin");
+  if (origin) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
+  }
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
 app.set("trust proxy", true);
 app.use(express.json({ limit: "100kb" }));
 app.use(express.static(path.join(__dirname, "public")));
@@ -337,9 +349,9 @@ app.post("/api/fp/login-ticket",(req,res)=>{if(req.body&&req.body.fbUser)ensureF
   if (user.patientActive === false) return bad(res, "noPatient", 404);
   const creds = db.credentials.filter((c) => c.userId === user.nhrId);
   if (!creds.length) return bad(res, "fpNone", 404);
-  const cred = creds.find((c) => c.rpId === rpHostOf(req));
-  if (!cred) return bad(res, "fpOtherHost", 409);
-  const t = newTicket({ purpose: "login", userId: user.nhrId, name: user.fullName, credentialId: cred.credentialId, pollKey, lang: lang === "bn" ? "bn" : "en" });
+  const hostCreds = creds.filter((c) => c.rpId === rpHostOf(req));
+  if (!hostCreds.length) return bad(res, "fpOtherHost", 409);
+  const t = newTicket({ purpose: "login", userId: user.nhrId, name: user.fullName, credentialId: hostCreds[0].credentialId, credentialIds: hostCreds.map(c => c.credentialId), pollKey, lang: lang === "bn" ? "bn" : "en" });
   res.json({ ticket: t.id, base: baseOf(req) });
 });
 
@@ -348,7 +360,7 @@ app.get("/api/fp/ticket/:id", (req, res) => {
   if (!t) return bad(res, "expired", 404);
   res.json({
     purpose: t.purpose, status: t.status, name: t.name, lang: t.lang, challenge: t.challenge,
-    userHandle: b64u.enc(Buffer.from(t.userId)), label: "NHR " + t.userId.slice(-4), credentialId: t.credentialId || null
+    userHandle: b64u.enc(Buffer.from(t.userId)), label: "NHR " + t.userId.slice(-4), credentialId: t.credentialId || null, credentialIds: t.credentialIds || (t.credentialId ? [t.credentialId] : [])
   });
 });
 
@@ -359,11 +371,11 @@ app.post("/api/fp/ticket/:id/enroll", (req, res) => {
   try {
     const b = req.body || {};
     const cd = JSON.parse(b64u.dec(b.clientDataJSON).toString("utf8"));
-    if (cd.type !== "webauthn.create" || cd.challenge !== t.challenge || cd.origin !== originOf(req)) return bad(res, "fpBad");
+    if (cd.type !== "webauthn.create" || cd.challenge !== t.challenge || cd.origin !== clientOrigin(req)) return bad(res, "fpBad");
     if (![-7, -257].includes(Number(b.alg)) || !b.rawId || !b.publicKey) return bad(res, "fpBad");
     crypto.createPublicKey({ key: b64u.dec(b.publicKey), format: "der", type: "spki" });
     const rpId = rpHostOf(req);
-    db.credentials = db.credentials.filter((c) => !(c.userId === t.userId && c.rpId === rpId));
+    db.credentials = db.credentials.filter((c) => c.credentialId !== b.rawId);
     db.credentials.push({ userId: t.userId, credentialId: b.rawId, publicKey: b.publicKey, alg: Number(b.alg), rpId, createdAt: new Date().toISOString() });
     save();
     t.status = "done";
@@ -377,11 +389,12 @@ app.post("/api/fp/ticket/:id/assert", (req, res) => {
   if (t.status !== "pending") return bad(res, "used", 409);
   try {
     const b = req.body || {};
-    const cred = db.credentials.find((c) => c.userId === t.userId && c.credentialId === t.credentialId);
-    if (!cred || b.credentialId !== t.credentialId) return bad(res, "fpBad");
+    const allowed = t.credentialIds || (t.credentialId ? [t.credentialId] : []);
+    const cred = db.credentials.find((c) => c.userId === t.userId && c.credentialId === b.credentialId && allowed.includes(b.credentialId));
+    if (!cred) return bad(res, "fpBad");
     const cdRaw = b64u.dec(b.clientDataJSON);
     const cd = JSON.parse(cdRaw.toString("utf8"));
-    if (cd.type !== "webauthn.get" || cd.challenge !== t.challenge || cd.origin !== originOf(req)) return bad(res, "fpBad");
+    if (cd.type !== "webauthn.get" || cd.challenge !== t.challenge || cd.origin !== clientOrigin(req)) return bad(res, "fpBad");
     const authData = b64u.dec(b.authenticatorData);
     if (!authData.subarray(0, 32).equals(sha256(Buffer.from(rpHostOf(req))))) return bad(res, "fpBad");
     const flags = authData[32];
