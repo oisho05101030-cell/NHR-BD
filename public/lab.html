@@ -410,7 +410,7 @@ textarea.inp{height:auto;padding:14px;min-height:90px;resize:vertical}
 </div>
 
 <!-- Password Change Modal -->
-<div class="modal" id="modal" hidden>
+<div class="modal" id="modal" hidden style="z-index:9999;">
   <div class="mcard" role="dialog" aria-modal="true">
     <h3 data-i="pwTitle">Change Portal Password</h3>
     <input class="inp" type="password" id="mCur" placeholder="Current Password" style="margin-top:12px;" />
@@ -650,40 +650,106 @@ async function createBirthId(e){
 $("nhrIn").addEventListener("keydown",(e)=>{if(e.key==="Enter")doSearch()});
 $("seBtn").onclick=()=>doSearch();
 
+let labPollId = 0, labCdId = 0;
+function stopLabPoll(){ clearInterval(labPollId); labPollId = 0; }
+function stopLabCd(){ clearInterval(labCdId); labCdId = 0; }
+
+async function labApi(url, body) {
+  try {
+    const opt = body !== undefined
+      ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+      : { method: "GET" };
+    const r = await fetch(url, opt);
+    const data = await r.json().catch(() => ({}));
+    return { ok: r.ok, status: r.status, data };
+  } catch (e) {
+    return { ok: false, status: 0, data: {} };
+  }
+}
+
+function getFacCtx() {
+  const facId = (F && (F.facilityId || F.id)) || (ses && (ses.facilityId || ses.uid)) || "L00000001";
+  const facName = (F && F.name) || "Diagnostic Lab / Hospital";
+  return { uid: facId, bmdc: facId, name: facName, hospital: facName, specialty: "Diagnostic Facility" };
+}
+
 async function doSearch(){
   const raw = $("nhrIn").value.trim().toUpperCase();
+  const cleanNhr = raw.replace(/[^A-Z0-9]/g, "");
+  const dashNhr = cleanNhr.startsWith("NHR") && cleanNhr.length > 3 ? "NHR-" + cleanNhr.slice(3) : raw;
   const n = digits(raw);
-  const isBirthId = /^B\d{8}$/.test(raw);
+  const isBirthId = /^B\d{8,17}$/.test(raw);
+  const isNhr = /^NHR[A-Z0-9]{6,12}$/.test(cleanNhr);
 
   $("seErr").textContent="";
-  if(!isBirthId && n.length!==12 && n.length!==16){
+  stopLabPoll(); stopLabCd();
+  if(!isBirthId && !isNhr && n.length!==12 && n.length!==16){
     $("seErr").textContent=t("bad");
     return;
   }
 
   $("seBtn").disabled=true;
-  const searchKey = isBirthId ? raw : n;
-
   try {
-    let snap = await db.collection("users").where("nhrId", "==", searchKey).limit(1).get();
-    if(snap.empty) snap = await db.collection("users").where("nid", "==", searchKey).limit(1).get();
-    if(snap.empty && isBirthId) snap = await db.collection("users").where("birthId", "==", searchKey).limit(1).get();
+    let userDoc = null;
+    const tries = [
+      ["nhrId", dashNhr],
+      ["nhrId", cleanNhr],
+      ["nhrId", raw],
+      ["nid", n],
+      ["nidNumber", n],
+      ["birthId", raw]
+    ].filter(x => x[1]);
 
-    $("seBtn").disabled=false;
-    if(snap.empty){
+    for (const [field, val] of tries) {
+      const snap = await db.collection("users").where(field, "==", val).limit(1).get();
+      if (!snap.empty) { userDoc = snap.docs[0]; break; }
+    }
+
+    if (!userDoc) {
+      $("seBtn").disabled=false;
       found=null;method="";render();
       $("seErr").textContent=t("nf");
       return;
     }
 
-    const p = snap.docs[0].data();
+    const p = userDoc.data();
+    const pNhr = p.nhrId || p.birthId || dashNhr;
+    const pNid = p.nid || p.nidNumber || "";
+    const fbCreds = [];
+    if (p.fpCredentialJson) {
+      try { const parsed = JSON.parse(p.fpCredentialJson); if (parsed && parsed.credentialId) fbCreds.push(parsed); } catch(e){}
+    }
+    try {
+      for (const qf of [["userId", pNhr], ["userId", pNhr.replace(/[^A-Z0-9]/g, "")], ["nid", pNid]].filter(x => x[1])) {
+        const cs = await db.collection("fp_credentials").where(qf[0], "==", qf[1]).get();
+        cs.docs.forEach(cd => {
+          const c = cd.data();
+          if (c && c.credentialId && !fbCreds.some(x => x.credentialId === c.credentialId)) fbCreds.push(c);
+        });
+      }
+    } catch(ce){}
+
+    let age = p.age || 28;
+    if (p.dob) {
+      const d = new Date(p.dob), now = new Date();
+      if (!isNaN(d.getTime())) {
+        age = now.getFullYear() - d.getFullYear();
+        if (now < new Date(now.getFullYear(), d.getMonth(), d.getDate())) age--;
+      }
+    }
+
+    $("seBtn").disabled=false;
     found = {
+      uid: userDoc.id,
       maskedName: p.fullName || p.name || "Patient",
-      nhrId: p.nhrId || p.birthId || searchKey,
-      age: p.age || 28,
+      fullName: p.fullName || p.name || "Patient",
+      nhrId: pNhr,
+      nid: pNid,
+      age: age,
       gender: p.gender || "Male",
-      phone: p.phone || "01700000000",
-      email: p.email && !p.email.endsWith("@nhr.bd") ? p.email : ""
+      phone: p.phone || "",
+      email: p.email && !p.email.endsWith("@nhr.bd") ? p.email : "",
+      fbCreds: fbCreds
     };
     method="";render();
   } catch(e){
@@ -707,57 +773,140 @@ function renderFound(){
 }
 
 function drawMethod(){
-  const b=$("vbody");b.dataset.m=method+lang;
+  const b=$("vbody");b.dataset.m=method+lang;stopLabPoll();stopLabCd();
   if(method==="fp"){
     b.innerHTML="<p>"+t("fpHelp")+'</p><button class="btn" id="fpGo">'+t("fpGo")+'</button><div class="err" id="vErr"></div><div id="fpArea"></div>';
     $("fpGo").onclick=startFp;
   }
   if(method==="otp"){
-    const maskPh = found.phone ? "•••• ••" + found.phone.slice(-4) : "•••• ••0000";
-    const maskEm = found.email ? found.email.replace(/(.{2})(.*)(?=@)/, "$1***") : "No Registered Gmail";
-    b.innerHTML=`<p>${t("otpHelp")}</p>
-      <div style="margin-bottom:12px;">
-        <label style="font-size:13px;"><input type="radio" name="otpType" value="sms" checked /> Mobile SMS (Simulated / Fake SMS to ${maskPh})</label><br>
-        <label style="font-size:13px;"><input type="radio" name="otpType" value="email" ${!found.email?'disabled':''} /> Gmail (Real Email to ${maskEm})</label>
-      </div>
-      <button class="btn" id="otpSend">${t("otpSend")}</button>
-      <div id="otpArea"></div><div class="err" id="vErr"></div>`;
+    const maskPh = found.phone ? "•••• ••" + found.phone.slice(-2) : "";
+    const maskEm = found.email ? found.email.replace(/(.{2})(.*)(?=@)/, "$1***") : "";
+    const toInfo = (maskPh || maskEm) ? `<p style="font-size:13px;color:var(--muted);margin-bottom:10px;">OTP will be sent to registered ${maskEm ? "Email (" + esc(maskEm) + ")" : ""} ${maskPh ? " / Phone (" + esc(maskPh) + ")" : ""}</p>` : "";
+    b.innerHTML=`<p>${t("otpHelp")}</p>${toInfo}<button class="btn" id="otpSend">${t("otpSend")}</button><div id="otpArea"></div><div class="err" id="vErr"></div>`;
     $("otpSend").onclick=sendOtp;
   }
 }
 
-function startFp(){
-  $("fpArea").innerHTML='<div style="display:flex;align-items:center;gap:16px;margin-top:14px;"><div id="fpQr"></div><div><b>'+t("fpWait")+'</b></div></div>';
-  const qrData = `NHR_VERIFY:${found.nhrId}:${Date.now()}`;
-  new QRCode($("fpQr"),{text:qrData,width:140,height:140,colorDark:"#0c3b5e"});
-  
-  // Auto simulation for demonstration / phone scan callback
-  setTimeout(()=>{
-    openSession({ token: "auth-ok", nhrId: found.nhrId });
-  }, 4000);
+async function startFp(){
+  $("vErr").textContent = "";
+  $("fpGo").disabled = true;
+  const facCtx = getFacCtx();
+  const fbPatient = {
+    uid: found.uid,
+    nid: found.nid,
+    nhrId: found.nhrId,
+    fullName: found.fullName,
+    email: found.email,
+    phone: found.phone,
+    fpCreds: found.fbCreds
+  };
+  const r = await labApi("/api/doctor/verify/fp-start", {
+    nhrId: found.nhrId,
+    fbDoctor: facCtx,
+    fbPatient: fbPatient,
+    fbCreds: found.fbCreds
+  });
+  $("fpGo").disabled = false;
+  if (!r.ok) {
+    const errKey = r.data && r.data.error;
+    $("vErr").textContent = errKey === "fpNone"
+      ? (lang === "bn" ? "এই রোগীর অ্যাকাউন্টে কোনো ফিঙ্গারপ্রিন্ট নিবন্ধিত নেই।" : "No fingerprint registered on this patient's account.")
+      : (errKey === "fpOtherHost"
+        ? (lang === "bn" ? "ফিঙ্গারপ্রিন্টটি ভিন্ন ডোমেইনে নিবন্ধিত। রোগীকে এই সাইটে ফিঙ্গারপ্রিন্ট যোগ করতে বলুন।" : "Fingerprint was registered on a different domain.")
+        : t("srvErr"));
+    return;
+  }
+  $("fpArea").innerHTML = '<div style="display:flex;align-items:center;gap:16px;margin-top:14px;"><div id="fpQr"></div><div><b>' + t("fpWait") + '</b><small style="display:block;color:var(--muted);margin-top:4px;">' + (lang === "bn" ? "রোগীর ফোনে স্ক্যান করে ফিঙ্গারপ্রিন্ট দিলে তবেই খুলবে।" : "Unlocks only after patient scans QR and verifies fingerprint on phone.") + '</small></div></div>';
+  if (window.QRCode) new QRCode($("fpQr"), { text: r.data.qrUrl, width: 150, height: 150, colorDark: "#0c3b5e" });
+  else $("fpQr").textContent = r.data.qrUrl;
+
+  const reqId = r.data.requestId, t0 = Date.now();
+  stopLabPoll();
+  labPollId = setInterval(async () => {
+    if (Date.now() - t0 > 120000) {
+      stopLabPoll();
+      $("fpArea").innerHTML = "";
+      $("vErr").textContent = t("fpDenied");
+      return;
+    }
+    const s = await labApi("/api/doctor/verify/fp-status?id=" + encodeURIComponent(reqId) + "&dt=" + encodeURIComponent(facCtx.uid));
+    if (s.ok && s.data.status === "approved") {
+      stopLabPoll();
+      openSession(s.data);
+    } else if (s.ok && s.data.status === "denied") {
+      stopLabPoll();
+      $("fpArea").innerHTML = "";
+      $("vErr").textContent = t("fpDenied");
+    }
+  }, 2000);
 }
 
-function sendOtp(){
-  generatedOtp = String(Math.floor(100000 + Math.random() * 900000));
-  const isEmail = document.querySelector('input[name="otpType"]:checked').value === "email";
-  
-  if(isEmail && found.email){
-    toast("Real OTP Triggered to " + found.email + " (Code: " + generatedOtp + ")");
-  } else {
-    toast("Simulated SMS Sent to " + found.phone + " (Code: " + generatedOtp + ")");
-  }
-
-  $("otpArea").innerHTML=`<label class="lbl">${t("otpIn")}</label>
-    <input class="inp" id="otpC" maxlength="6" style="letter-spacing:.4em;font-size:20px;text-align:center;font-weight:700;" placeholder="000000">
-    <button class="btn ok" id="otpOk" style="margin-top:10px;width:100%;">${t("otpOk")}</button>`;
-  
-  $("otpOk").onclick = () => {
-    if($("otpC").value.trim() === generatedOtp){
-      openSession({ token: "auth-ok", nhrId: found.nhrId });
-    } else {
-      $("vErr").textContent = t("otpBad");
-    }
+async function sendOtp(){
+  $("vErr").textContent = "";
+  $("otpSend").disabled = true;
+  const facCtx = getFacCtx();
+  const fbPatient = {
+    uid: found.uid,
+    nid: found.nid,
+    nhrId: found.nhrId,
+    fullName: found.fullName,
+    email: found.email,
+    phone: found.phone
   };
+  const r = await labApi("/api/doctor/verify/otp-send", {
+    nhrId: found.nhrId,
+    fbDoctor: facCtx,
+    fbPatient: fbPatient
+  });
+  if (!r.ok) {
+    $("otpSend").disabled = false;
+    const er = r.data && r.data.error;
+    if (er === "noEmail") {
+      $("vErr").textContent = lang === "bn" ? "এই রোগীর অ্যাকাউন্টে কোনো ইমেইল যুক্ত নেই।" : "No email address found on this patient's account.";
+    } else if (er === "mailFail") {
+      $("vErr").textContent = lang === "bn" ? "সার্ভার থেকে OTP ইমেইল পাঠানো যায়নি।" : "Could not send OTP email from server.";
+    } else {
+      $("vErr").textContent = t("srvErr");
+    }
+    return;
+  }
+  toast(lang === "bn" ? "রোগীর ইমেইলে ৬ সংখ্যার OTP পাঠানো হয়েছে।" : "6-digit OTP sent to patient's email.");
+  $("otpArea").innerHTML = `<label class="lbl">${t("otpIn")}</label>
+    <input class="inp" id="otpC" inputmode="numeric" maxlength="6" style="letter-spacing:.4em;font-size:20px;text-align:center;font-weight:700;" placeholder="000000">
+    <button class="btn ok" id="otpOk" style="margin-top:10px;width:100%;">${t("otpOk")}</button>`;
+  $("otpC").focus();
+  $("otpOk").onclick = verifyOtp;
+  $("otpC").addEventListener("keydown", (e) => { if (e.key === "Enter") verifyOtp(); });
+
+  let sec = 30;
+  stopLabCd();
+  $("otpSend").textContent = "Resend in 30s";
+  labCdId = setInterval(() => {
+    sec--;
+    if (sec <= 0) {
+      stopLabCd();
+      $("otpSend").disabled = false;
+      $("otpSend").textContent = t("otpSend");
+    } else {
+      $("otpSend").textContent = "Resend in " + sec + "s";
+    }
+  }, 1000);
+}
+
+async function verifyOtp(){
+  const c = digits($("otpC").value);
+  if (c.length !== 6) { $("vErr").textContent = t("otpBad"); return; }
+  $("otpOk").disabled = true;
+  const facCtx = getFacCtx();
+  const r = await labApi("/api/doctor/verify/otp-verify", {
+    nhrId: found.nhrId,
+    code: c,
+    fbDoctor: facCtx,
+    fbPatient: { uid: found.uid, nid: found.nid, nhrId: found.nhrId, fullName: found.fullName }
+  });
+  $("otpOk").disabled = false;
+  if (!r.ok) { $("vErr").textContent = t("otpBad"); return; }
+  openSession(r.data);
 }
 
 function openSession(g){
@@ -894,6 +1043,96 @@ document.addEventListener("click",(e)=>{
 document.querySelectorAll(".lang button").forEach((b)=>b.addEventListener("click",()=>{lang=b.dataset.l;localStorage.setItem("nhr_lang",lang);render()}));
 $("logout").onclick=()=>{clearSession();location.href="login.html";};
 
+/* ===== Mandatory & Voluntary Password Change ===== */
+let forcePwChange = false;
+function openPwModal(mandatory) {
+  forcePwChange = !!mandatory;
+  $("mCur").value = "";
+  $("mNew").value = "";
+  $("mErr").textContent = "";
+  const titleEl = $("modal").querySelector("h3");
+  if (titleEl) {
+    titleEl.textContent = mandatory
+      ? (lang === "bn" ? "প্রথম লগইন: পাসওয়ার্ড পরিবর্তন বাধ্যতামূলক" : "First Login: Password Change Required")
+      : (lang === "bn" ? "পাসওয়ার্ড পরিবর্তন করুন" : "Change Portal Password");
+  }
+  $("mNo").hidden = !!mandatory;
+  $("modal").hidden = false;
+  setTimeout(() => $("mCur").focus(), 50);
+}
+
+document.addEventListener("click", async (e) => {
+  if (e.target.closest("#pwBtn")) {
+    e.preventDefault();
+    openPwModal(false);
+    return;
+  }
+  if (e.target.closest("#tempNote button")) {
+    e.preventDefault();
+    openPwModal(forcePwChange);
+    return;
+  }
+  if (e.target.closest("#mNo")) {
+    e.preventDefault();
+    if (!forcePwChange) $("modal").hidden = true;
+    return;
+  }
+  if (e.target.closest("#mGo")) {
+    e.preventDefault();
+    $("mErr").textContent = "";
+    const curPw = $("mCur").value;
+    const newPw = $("mNew").value;
+    if (!curPw) { $("mErr").textContent = lang === "bn" ? "বর্তমান পাসওয়ার্ড দিন।" : "Enter your current password."; return; }
+    if (newPw.length < 8) { $("mErr").textContent = lang === "bn" ? "নতুন পাসওয়ার্ড কমপক্ষে ৮ অক্ষরের হতে হবে।" : "New password must be at least 8 characters."; return; }
+    if (newPw === curPw) { $("mErr").textContent = lang === "bn" ? "নতুন পাসওয়ার্ডটি আগের পাসওয়ার্ড থেকে ভিন্ন হতে হবে।" : "New password must be different from current password."; return; }
+
+    const btn = $("mGo");
+    btn.disabled = true;
+    try {
+      const facId = (F && (F.facilityId || F.id)) || (ses && (ses.facilityId || ses.uid)) || "";
+      const targetEmail = (auth.currentUser && auth.currentUser.email) || (ses && ses.email) || (F && F.email) || (facId ? facId.toLowerCase() + "@nhr.bd" : "");
+      let user = auth.currentUser;
+      if (!user && targetEmail) {
+        const cred = await auth.signInWithEmailAndPassword(targetEmail, curPw);
+        user = cred.user;
+      } else if (user && targetEmail) {
+        const cred = firebase.auth.EmailAuthProvider.credential(targetEmail, curPw);
+        await user.reauthenticateWithCredential(cred);
+      }
+      if (!user) throw new Error("No authenticated user found.");
+      await user.updatePassword(newPw);
+
+      const upd = { tempPw: false, mustChangePassword: false, passwordChanged: true, updatedAt: new Date().toISOString() };
+      if (facId) {
+        try { await db.collection("facilities").doc(facId).set(upd, { merge: true }); } catch (err) {}
+        try { await db.collection("facilities").doc(facId.toUpperCase()).set(upd, { merge: true }); } catch (err) {}
+      }
+      if (user.uid) {
+        try { await db.collection("users").doc(user.uid).set(upd, { merge: true }); } catch (err) {}
+      }
+      if (F) Object.assign(F, upd);
+      if (ses) {
+        ses.tempPw = false;
+        ses.mustChangePassword = false;
+        try { localStorage.setItem("nhr_session", JSON.stringify(ses)); } catch (err) {}
+        try { sessionStorage.setItem("nhr_session", JSON.stringify(ses)); } catch (err) {}
+        try { localStorage.setItem("nhr_user", JSON.stringify(ses)); } catch (err) {}
+      }
+      forcePwChange = false;
+      $("tempNote").hidden = true;
+      $("modal").hidden = true;
+      toast(lang === "bn" ? "পাসওয়ার্ড সফলভাবে পরিবর্তন হয়েছে!" : "Password updated successfully!");
+    } catch (err) {
+      console.error("Lab password update error:", err);
+      $("mErr").textContent = (err && (err.code === "auth/wrong-password" || err.code === "auth/invalid-credential"))
+        ? (lang === "bn" ? "বর্তমান পাসওয়ার্ডটি সঠিক নয়।" : "Current password is incorrect.")
+        : (lang === "bn" ? "পাসওয়ার্ড পরিবর্তন করা যায়নি। পুনরায় লগইন করে চেষ্টা করুন।" : "Could not update password. Please sign in again and retry.");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+});
+
 /* Init Load */
 (async()=>{
   render();
@@ -905,11 +1144,16 @@ $("logout").onclick=()=>{clearSession();location.href="login.html";};
       snap = await db.collection("facilities").doc(facIdUpper).get();
     }
     if(snap.exists){ F = { id: snap.id, ...snap.data() }; }
-    else { F = { id: facId, name: "Hospital Diagnostic Portal", license: "Verified", phone: "01700000000" }; }
+    else { F = { id: facId, name: "Hospital Diagnostic Portal", license: "Verified", phone: "01700000000", tempPw: true }; }
   } catch(e){
-    F = { id: "L00000001", name: "Hospital Diagnostic Portal", license: "Verified" };
+    F = { id: "L00000001", name: "Hospital Diagnostic Portal", license: "Verified", tempPw: true };
   }
   render();
+  const needsPwChange = !!(F.tempPw || F.mustChangePassword || ses.tempPw || F.passwordChanged !== true);
+  $("tempNote").hidden = !needsPwChange;
+  if (needsPwChange) {
+    openPwModal(true);
+  }
 })();
 </script>
 </body>
