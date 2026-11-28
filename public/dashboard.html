@@ -1361,7 +1361,9 @@ function startLiveSync() {
       REC.records = snap.docs.map(d => d.data());
       render();
     }));
-    const vKeys = [...new Set([P.nhrId, P.nid, nhrKey].filter(Boolean))];
+    const cleanNhr = String(P.nhrId || "").replace(/[^A-Z0-9]/gi, "");
+    const dashNhr = cleanNhr.startsWith("NHR") && cleanNhr.length > 3 ? "NHR-" + cleanNhr.slice(3) : cleanNhr;
+    const vKeys = [...new Set([P.nhrId, cleanNhr, dashNhr, P.nid, nhrKey].filter(Boolean))];
     const vDocs = {};
     vKeys.forEach(vk => {
       LIVE_UNSUBS.push(db.collection("vitals").doc(vk).onSnapshot(vSnap => {

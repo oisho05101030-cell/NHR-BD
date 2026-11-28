@@ -1187,7 +1187,8 @@ async function saveRecord(){
       const bpVal = parseFloat(RX.bp), gluVal = parseFloat(RX.glucose), hbaVal = parseFloat(RX.hba1c);
       if(!isNaN(bpVal) || !isNaN(gluVal) || !isNaN(hbaVal)){
         const monthKey = todayStr().slice(0, 7);
-        const vRef = db.collection("vitals").doc(S.nhrId);
+        const normVId = String(S.nhrId).replace(/[^A-Z0-9]/gi, "");
+        const vRef = db.collection("vitals").doc(normVId);
         await db.runTransaction(async (tx) => {
           const snap = await tx.get(vRef);
           const v = snap.exists ? snap.data() : { dates: [], bp: [], glucose: [], hba1c: [] };

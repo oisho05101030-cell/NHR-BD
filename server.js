@@ -960,6 +960,7 @@ function resolvePatientCtx(req) {
 }
 
 app.post("/api/doctor/verify/fp-start", (req, res) => {
+  if (req.body && req.body.fbCreds) hydrateCredList(req.body.fbCreds);
   const d = resolveDocCtx(req); if (!d) return bad(res, "noSession", 401);
   const p = resolvePatientCtx(req); if (!p) return bad(res, "nf", 404);
   const creds = db.credentials.filter((c) => c.userId === p.nhrId);
