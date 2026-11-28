@@ -79,17 +79,41 @@
               if (!s.empty) { docSnap = s.docs[0]; break; }
             }
           } else {
-            const s = await window.db.collection("users").where("nid", "==", id).limit(1).get();
-            if (!s.empty) docSnap = s.docs[0];
+            for (const field of ["nid", "nidNumber", "identity.nid"]) {
+              const s = await window.db.collection("users").where(field, "==", id).limit(1).get();
+              if (!s.empty) { docSnap = s.docs[0]; break; }
+            }
           }
+          try {
+            const cSnap = await window.db.collection("fp_credentials").where(isDoc ? "bmdc" : "nid", "==", id).get();
+            cSnap.docs.forEach(cd => {
+              const cData = cd.data();
+              if (cData && cData.credentialId) fbCreds.push(cData);
+              if (!fbUser && cData) {
+                fbUser = {
+                  uid: cData.uid || "",
+                  nid: cData.nid || (isDoc ? "" : id),
+                  bmdc: cData.bmdc || (isDoc ? id : ""),
+                  role: isDoc ? "doctor" : "patient",
+                  fullName: cData.name || "",
+                  email: cData.email || "",
+                  nhrId: cData.userId || (isDoc ? id : ""),
+                  fpCreds
+                };
+              }
+            });
+          } catch (ce) {}
           if (docSnap) {
             const d = docSnap.data();
             if (d.fpCredentialJson) {
-              try { const parsed = JSON.parse(d.fpCredentialJson); if (parsed && parsed.credentialId) fbCreds.push(parsed); } catch (e) {}
+              try {
+                const parsed = JSON.parse(d.fpCredentialJson);
+                if (parsed && parsed.credentialId && !fbCreds.some(x => x.credentialId === parsed.credentialId)) fbCreds.push(parsed);
+              } catch (e) {}
             }
             fbUser = {
               uid: docSnap.id,
-              nid: d.nid || (isDoc ? "" : id),
+              nid: d.nid || d.nidNumber || (isDoc ? "" : id),
               bmdc: d.bmdc || (isDoc ? id : ""),
               role: isDoc ? "doctor" : "patient",
               fullName: d.fullName || d.name || "",

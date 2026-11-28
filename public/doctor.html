@@ -779,7 +779,7 @@ async function _apiInner(url, body, method, access) {
 
 /* ===== State ===== */
 let D_data=null,found=null,S=null,method="",tab="sum",filter="all",section="overview",tickId=0,pollId=0,cdId=0,vChart=null,AUD=[],scanStream=null,scanRaf=0,lastAct=Date.now(),mockFp=0;
-let RX={type:"rx",title:"",notes:"",detail:"",meds:[{name:"",dose:"",freq:"",duration:""}],override:""};
+let RX={type:"rx",title:"",notes:"",detail:"",meds:[{name:"",dose:"",freq:"",duration:""}],override:"",bp:"",glucose:"",hba1c:""};
 let NOTIFS=[];
 let APPTS=[];
 const NAV=[["overview","nOverview","M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10"],["search","nSearch","M11 4a7 7 0 100 14 7 7 0 000-14zM21 21l-5-5"],["appointments","nAppointments","M8 7V3m8 4V3M3 11h18M5 5h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z"],["audit","nAudit","M4 4h16v16H4zM8 9h8M8 13h8M8 17h5"],["profile","nProfile","M12 12a4 4 0 100-8 4 4 0 000 8zM4 21c0-4 4-6 8-6s8 2 8 6"],["settings","nSettings","M12 8a4 4 0 100 8 4 4 0 000-8zM12 2v3M12 19v3M2 12h3M19 12h3"]];
@@ -1155,6 +1155,7 @@ function addFormHtml(){
     '<label class="lbl">'+(RX.type==="rx"?t("adDiag"):t("adTitle"))+'</label><input class="inp" id="adN" data-k="title" maxlength="120" value="'+esc(RX.title)+'">'+
     (RX.type==="rx"?'<label class="lbl">'+t("adMeds")+'</label><div class="mr mh"><span>'+t("medName")+"</span><span>"+t("medDose")+"</span><span>"+t("medFreq")+"</span><span>"+t("medDur")+'</span><span></span></div>'+rows+'<button type="button" class="add" id="addMed">'+t("addMed")+'</button><label class="lbl">'+t("adAdvice")+'</label><textarea class="inp" data-k="notes" maxlength="1000">'+esc(RX.notes)+"</textarea>"
       :'<label class="lbl">'+t("adDetail")+'</label><textarea class="inp" data-k="detail" maxlength="3000">'+esc(RX.detail)+"</textarea>")+
+    '<div style="margin-top:14px;padding:12px;border-radius:12px;background:#f4fafe;border:1px solid #d3e8f6"><label class="lbl" style="margin-top:0;color:#0c3b5e">'+(lang==="bn"?"ভাইটাল রিডিং (ঐচ্ছিক — রোগীর গ্রাফ আপডেট হবে)":"Patient Vitals (Optional — updates live dashboard graph)")+'</label><div class="g2" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:8px"><div><small style="display:block;color:#5b6b80;margin-bottom:4px">Systolic BP (mmHg)</small><input type="number" class="inp" data-k="bp" placeholder="e.g. 120" value="'+esc(RX.bp)+'"></div><div><small style="display:block;color:#5b6b80;margin-bottom:4px">Blood Glucose (mmol/L)</small><input type="number" step="0.1" class="inp" data-k="glucose" placeholder="e.g. 5.6" value="'+esc(RX.glucose)+'"></div><div><small style="display:block;color:#5b6b80;margin-bottom:4px">HbA1c (%)</small><input type="number" step="0.1" class="inp" data-k="hba1c" placeholder="e.g. 5.4" value="'+esc(RX.hba1c)+'"></div></div></div>'+
     '<div id="alwBox"></div><div class="err" id="adE"></div><button class="btn" id="adSave">'+t("adSave")+"</button></div>";
 }
 function checkAllergies(){
@@ -1180,8 +1181,32 @@ async function saveRecord(){
   if(!r.ok){e.textContent=t(r.status===403?"expired":"srvErr");return}
   const detail=isRx?body.items.map((i)=>i.name+(i.dose?" "+i.dose:"")+(i.freq?" - "+i.freq:"")+(i.duration?" - "+i.duration:"")).join("; ")+(notes?". "+notes:""):body.detail;
   const rec={date:todayStr(),type:RX.type,title:body.title,by:D.name,detail};
+  if(window.db && S && S.nhrId){
+    try {
+      await db.collection("records").add({ ...rec, nhrId: S.nhrId, doctorId: D.bmdc || "", createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      const bpVal = parseFloat(RX.bp), gluVal = parseFloat(RX.glucose), hbaVal = parseFloat(RX.hba1c);
+      if(!isNaN(bpVal) || !isNaN(gluVal) || !isNaN(hbaVal)){
+        const monthKey = todayStr().slice(0, 7);
+        const vRef = db.collection("vitals").doc(S.nhrId);
+        await db.runTransaction(async (tx) => {
+          const snap = await tx.get(vRef);
+          const v = snap.exists ? snap.data() : { dates: [], bp: [], glucose: [], hba1c: [] };
+          const dates = Array.isArray(v.dates) ? [...v.dates] : [];
+          const bp = Array.isArray(v.bp) ? [...v.bp] : [];
+          const glucose = Array.isArray(v.glucose) ? [...v.glucose] : [];
+          const hba1c = Array.isArray(v.hba1c) ? [...v.hba1c] : [];
+          let idx = dates.indexOf(monthKey);
+          if(idx === -1){ idx = dates.length; dates.push(monthKey); bp.push(null); glucose.push(null); hba1c.push(null); }
+          if(!isNaN(bpVal)) bp[idx] = bpVal;
+          if(!isNaN(gluVal)) glucose[idx] = gluVal;
+          if(!isNaN(hbaVal)) hba1c[idx] = hbaVal;
+          tx.set(vRef, { dates, bp, glucose, hba1c, updatedAt: new Date().toISOString() }, { merge: true });
+        });
+      }
+    } catch(ve) { console.error("Firestore record/vitals sync error:", ve); }
+  }
   (S.data.records=S.data.records||[]).push(rec);
-  RX={type:"rx",title:"",notes:"",detail:"",meds:[{name:"",dose:"",freq:"",duration:""}],override:""};
+  RX={type:"rx",title:"",notes:"",detail:"",meds:[{name:"",dose:"",freq:"",duration:""}],override:"",bp:"",glucose:"",hba1c:""};
   toast(t("adOk"));notify("recAdded",S.name);tab="tl";renderPatient();
 }
 

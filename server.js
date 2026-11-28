@@ -627,6 +627,19 @@ app.post("/api/fp/login-ticket", async (req, res) => {
     }
     creds = user ? matchUserCreds(user) : [];
   }
+  if (!user) {
+    const cMatch = db.credentials.find((c) => isDoc ? ((c.bmdc && c.bmdc.toUpperCase() === cleanId) || (c.userId && c.userId.toUpperCase() === cleanId)) : (c.nid === cleanId));
+    if (cMatch) {
+      user = ensureFb({
+        uid: cMatch.uid || "",
+        nid: cMatch.nid || (!isDoc ? cleanId : ""),
+        bmdc: cMatch.bmdc || (isDoc ? cleanId : ""),
+        role: isDoc ? "doctor" : "patient",
+        fullName: cMatch.name || "",
+        nhrId: cMatch.userId || cleanId
+      });
+    }
+  }
   if (!user) return bad(res, "noUser", 404);
   if (user.patientActive === false) return bad(res, "noPatient", 404);
   if (!creds.length) return bad(res, "fpNone", 404);

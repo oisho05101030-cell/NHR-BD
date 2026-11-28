@@ -584,7 +584,21 @@ function initVitalsChart(){
   if(vChart)vChart.destroy();
   const dates = VITALS.dates && VITALS.dates.length ? VITALS.dates : [];
   const s={bp:[t("vBp"),VITALS.bp||[],"#0a8fc7","rgba(10,143,199,.1)"],glucose:[t("vGlu"),VITALS.glucose||[],"#f59e0b","rgba(245,158,11,.1)"],hba1c:[t("vHba"),VITALS.hba1c||[],"#d92d3a","rgba(217,45,58,.1)"]}[$("vitalsMetric").value];
-  vChart=new Chart($("vitalsChart").getContext("2d"),{type:"line",data:{labels:dates.map((x)=>new Date(x+"-01T00:00:00").toLocaleDateString(loc(),{month:"short"})),datasets:[{label:s[0],data:s[1],borderColor:s[2],backgroundColor:s[3],fill:true,tension:.3,borderWidth:2.5,pointRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:"top"}},scales:{y:{beginAtZero:false}}}});
+  let emptyEl = $("vitalsEmptyHint");
+  if(!emptyEl){
+    emptyEl = document.createElement("p");
+    emptyEl.id = "vitalsEmptyHint";
+    emptyEl.className = "hint";
+    emptyEl.style.cssText = "margin:8px 0 0;text-align:center";
+    $("vitalsChart").parentElement.appendChild(emptyEl);
+  }
+  emptyEl.textContent = dates.length ? "" : (lang === "bn" ? "এখনও কোনো ভাইটাল রিডিং যুক্ত হয়নি। ডাক্তার বা হাসপাতাল/ল্যাব রিপোর্ট দিলে এখানে গ্রাফ দেখা যাবে।" : "No vitals recorded yet. Readings added by your doctor or hospital/lab will appear here automatically.");
+  const fmtLbl = (x) => {
+    const iso = String(x).length === 7 ? x + "-01T00:00:00" : String(x) + "T00:00:00";
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? String(x) : d.toLocaleDateString(loc(), String(x).length === 7 ? { month: "short", year: "2-digit" } : { day: "numeric", month: "short" });
+  };
+  vChart=new Chart($("vitalsChart").getContext("2d"),{type:"line",data:{labels:dates.map(fmtLbl),datasets:[{label:s[0],data:s[1],borderColor:s[2],backgroundColor:s[3],fill:true,tension:.3,borderWidth:2.5,pointRadius:4,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:"top"}},scales:{y:{beginAtZero:false}}}});
 }
 $("vitalsMetric").addEventListener("change",initVitalsChart);
 
@@ -1165,7 +1179,7 @@ $("editEmBtn").onclick=()=>{
     run:async()=>{
       const e2={name:$("mEmName").value.trim(),relation:$("mEmRel").value.trim(),phone:$("mEmPhone").value.trim()};
       if(!e2.name||!BD_PHONE.test(e2.phone))return t("emNeed");
-      try { await db.collection("users").doc(P.uid || P.nhrId || P.nid).update({ emergency: e2 }); } catch(e){}
+      try { await db.collection("users").doc(P.uid || P.nhrId || P.nid).set({ emergency: e2, emergencyContact: e2, health: { ...(P.health || {}), emergencyContact: e2 } }, { merge: true }); } catch(e){}
       const r=await api("/api/patient/emergency",e2);
       P.emergency=e2;render();toast(t("saved"));return null;
     }});
@@ -1278,7 +1292,7 @@ function startLiveSync() {
       P = { ...P, ...d, uid: snap.id };
       P.dob = P.dob || P.dateOfBirth || "";
       P.bloodGroup = P.bloodGroup || P.health?.bloodGroup || "";
-      P.emergency = P.emergency || P.emergencyContact || { name: "", relation: "", phone: "" };
+      P.emergency = (P.emergency && P.emergency.name) ? P.emergency : ((P.emergencyContact && P.emergencyContact.name) ? P.emergencyContact : ((P.health && P.health.emergencyContact && P.health.emergencyContact.name) ? P.health.emergencyContact : { name: "", relation: "", phone: "" }));
       P.address = typeof P.address === "string" ? P.address : P.address?.details || "";
       P.district = P.district || P.addressInfo?.district || "";
       P.division = P.division || P.addressInfo?.division || "";
@@ -1347,10 +1361,17 @@ function startLiveSync() {
       REC.records = snap.docs.map(d => d.data());
       render();
     }));
-    LIVE_UNSUBS.push(db.collection("vitals").doc(nhrKey).onSnapshot(vSnap => {
-      VITALS = vSnap.exists ? vSnap.data() : { dates: [], bp: [], glucose: [], hba1c: [] };
-      initVitalsChart();
-    }));
+    const vKeys = [...new Set([P.nhrId, P.nid, nhrKey].filter(Boolean))];
+    const vDocs = {};
+    vKeys.forEach(vk => {
+      LIVE_UNSUBS.push(db.collection("vitals").doc(vk).onSnapshot(vSnap => {
+        if (vSnap.exists) vDocs[vk] = vSnap.data();
+        else delete vDocs[vk];
+        const chosen = vDocs[P.nhrId] || vDocs[P.nid] || vDocs[nhrKey] || { dates: [], bp: [], glucose: [], hba1c: [] };
+        VITALS = chosen;
+        initVitalsChart();
+      }));
+    });
     LIVE_UNSUBS.push(db.collection("allergies").where("nhrId", "==", nhrKey).onSnapshot(snap => {
       REC.allergies = snap.docs.map(d => d.data());
       render();
@@ -1461,7 +1482,7 @@ auth.onAuthStateChanged(async (user) => {
   if (P) {
     P.dob = P.dob || P.dateOfBirth || "";
     P.bloodGroup = P.bloodGroup || P.health?.bloodGroup || "";
-    P.emergency = P.emergency || P.emergencyContact || { name: "", relation: "", phone: "" };
+    P.emergency = (P.emergency && P.emergency.name) ? P.emergency : ((P.emergencyContact && P.emergencyContact.name) ? P.emergencyContact : ((P.health && P.health.emergencyContact && P.health.emergencyContact.name) ? P.health.emergencyContact : { name: "", relation: "", phone: "" }));
     P.address = typeof P.address === "string" ? P.address : P.address?.details || "";
     P.district = P.district || P.addressInfo?.district || "";
     P.division = P.division || P.addressInfo?.division || "";
