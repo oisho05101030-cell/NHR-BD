@@ -227,8 +227,9 @@ h2{font-size:24px;font-weight:800;letter-spacing:-.02em;color:var(--navy)}.sub{m
     <div class="stats" id="stats"></div>
     <div class="qa" id="qa"></div>
     <div class="panel">
-      <div class="ph"><h3><span data-i="vitalsTitle"></span></h3><select id="vitalsMetric" class="select-box" style="width:auto;height:34px;font-size:12px"><option value="bp"></option><option value="glucose"></option><option value="hba1c"></option></select></div>
-      <div style="height:250px;position:relative"><canvas id="vitalsChart"></canvas></div>
+      <div class="ph" style="flex-wrap:wrap;gap:8px"><h3><span data-i="vitalsTitle"></span></h3><select id="vitalsMetric" class="select-box" style="width:auto;max-width:100%;height:34px;font-size:12px"><option value="bp"></option><option value="glucose"></option><option value="hba1c"></option></select></div>
+      <div style="height:230px;position:relative;width:100%"><canvas id="vitalsChart"></canvas></div>
+      <p id="vitalsEmptyHint" class="hint" style="margin:10px 0 0;text-align:center;font-size:12.5px;line-height:1.45"></p>
     </div>
     <div class="panel"><div class="ph"><h3 data-i="recent"></h3><button class="link" data-go="timeline" data-i="viewAll"></button></div><div id="recent"></div></div>
   </section>
@@ -579,26 +580,89 @@ function viewRecordDetails(rec){
 }
 
 /* ===== Vitals Chart ===== */
+function buildMergedVitals(){
+  const map = {};
+  const addPoint = (dt, bp, glu, hba) => {
+    if (!dt) return;
+    const key = String(dt).slice(0, 7);
+    if (!/^d{4}-d{2}/.test(key)) return;
+    if (!map[key]) map[key] = { bp: null, glucose: null, hba1c: null };
+    if (bp !== null && bp !== undefined && !isNaN(Number(bp))) map[key].bp = Number(bp);
+    if (glu !== null && glu !== undefined && !isNaN(Number(glu))) map[key].glucose = Number(glu);
+    if (hba !== null && hba !== undefined && !isNaN(Number(hba))) map[key].hba1c = Number(hba);
+  };
+  const dArr = Array.isArray(VITALS.dates) ? VITALS.dates : [];
+  dArr.forEach((d, i) => addPoint(d, (VITALS.bp || [])[i], (VITALS.glucose || [])[i], (VITALS.hba1c || [])[i]));
+
+  (REC.records || []).forEach(r => {
+    const dt = r.date || (r.when ? String(r.when).slice(0, 10) : "");
+    let bp = r.bp ?? null, glu = r.glucose ?? null, hba = r.hba1c ?? null;
+    if (Array.isArray(r.items)) {
+      r.items.forEach(it => {
+        const n = String(it.name || "").toLowerCase();
+        const v = parseFloat(it.value ?? it.val);
+        if (isNaN(v)) return;
+        if (bp === null && (n.includes("bp") || n.includes("blood pressure") || n.includes("systolic"))) bp = v;
+        if (glu === null && (n.includes("glucose") || n.includes("sugar") || n.includes("rbs") || n.includes("fbs"))) glu = v;
+        if (hba === null && n.includes("hba1c")) hba = v;
+      });
+    }
+    if (bp !== null || glu !== null || hba !== null) addPoint(dt, bp, glu, hba);
+  });
+
+  const dates = Object.keys(map).sort();
+  return {
+    dates,
+    bp: dates.map(k => map[k].bp),
+    glucose: dates.map(k => map[k].glucose),
+    hba1c: dates.map(k => map[k].hba1c)
+  };
+}
+
 function initVitalsChart(){
   if(typeof Chart==="undefined"){toast(t("chartErr"));return}
   if(vChart)vChart.destroy();
-  const dates = VITALS.dates && VITALS.dates.length ? VITALS.dates : [];
-  const s={bp:[t("vBp"),VITALS.bp||[],"#0a8fc7","rgba(10,143,199,.1)"],glucose:[t("vGlu"),VITALS.glucose||[],"#f59e0b","rgba(245,158,11,.1)"],hba1c:[t("vHba"),VITALS.hba1c||[],"#d92d3a","rgba(217,45,58,.1)"]}[$("vitalsMetric").value];
-  let emptyEl = $("vitalsEmptyHint");
-  if(!emptyEl){
-    emptyEl = document.createElement("p");
-    emptyEl.id = "vitalsEmptyHint";
-    emptyEl.className = "hint";
-    emptyEl.style.cssText = "margin:8px 0 0;text-align:center";
-    $("vitalsChart").parentElement.appendChild(emptyEl);
+  const merged = buildMergedVitals();
+  const metric = $("vitalsMetric").value;
+  const s={bp:[t("vBp"),merged.bp,"#0a8fc7","rgba(10,143,199,.12)"],glucose:[t("vGlu"),merged.glucose,"#f59e0b","rgba(245,158,11,.12)"],hba1c:[t("vHba"),merged.hba1c,"#d92d3a","rgba(217,45,58,.12)"]}[metric];
+  const hasAny = s[1].some(v => v !== null && v !== undefined && !isNaN(v));
+  const emptyEl = $("vitalsEmptyHint");
+  if(emptyEl){
+    emptyEl.hidden = hasAny;
+    emptyEl.textContent = hasAny ? "" : (lang === "bn" ? "এই ক্যাটাগরিতে এখনও কোনো রিডিং যুক্ত হয়নি। ডাক্তার বা ল্যাব রিপোর্ট দিলে এখানে গ্রাফ দেখা যাবে।" : "No readings recorded for this metric yet. Values added by your doctor or lab will appear here.");
   }
-  emptyEl.textContent = dates.length ? "" : (lang === "bn" ? "এখনও কোনো ভাইটাল রিডিং যুক্ত হয়নি। ডাক্তার বা হাসপাতাল/ল্যাব রিপোর্ট দিলে এখানে গ্রাফ দেখা যাবে।" : "No vitals recorded yet. Readings added by your doctor or hospital/lab will appear here automatically.");
   const fmtLbl = (x) => {
     const iso = String(x).length === 7 ? x + "-01T00:00:00" : String(x) + "T00:00:00";
     const d = new Date(iso);
     return isNaN(d.getTime()) ? String(x) : d.toLocaleDateString(loc(), String(x).length === 7 ? { month: "short", year: "2-digit" } : { day: "numeric", month: "short" });
   };
-  vChart=new Chart($("vitalsChart").getContext("2d"),{type:"line",data:{labels:dates.map(fmtLbl),datasets:[{label:s[0],data:s[1],borderColor:s[2],backgroundColor:s[3],fill:true,tension:.3,borderWidth:2.5,pointRadius:4,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:"top"}},scales:{y:{beginAtZero:false}}}});
+  vChart=new Chart($("vitalsChart").getContext("2d"),{
+    type:"line",
+    data:{
+      labels: hasAny ? merged.dates.map(fmtLbl) : [],
+      datasets:[{
+        label:s[0],
+        data: hasAny ? s[1] : [],
+        borderColor:s[2],
+        backgroundColor:s[3],
+        pointBackgroundColor:s[2],
+        pointBorderColor:"#ffffff",
+        pointBorderWidth:2,
+        fill:true,
+        tension:.3,
+        borderWidth:2.5,
+        pointRadius:6,
+        pointHoverRadius:8,
+        spanGaps:true
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{legend:{display:true,position:"top"}},
+      scales:{y:{beginAtZero:false,grace:"15%"}}
+    }
+  });
 }
 $("vitalsMetric").addEventListener("change",initVitalsChart);
 
@@ -854,7 +918,7 @@ async function loadRecords(){
       db.collection("allergies").where("nhrId", "==", key).get(),
       db.collection("conditions").where("nhrId", "==", key).get()
     ]);
-    REC.records = snap.docs.map(d=>d.data());
+    REC.records = (snap.docs.map(d=>d.data())).map(r => (!r.type && (r.facilityId || r.reportNo || r.category || Array.isArray(r.items))) ? { ...r, type: "lab" } : r);
     VITALS = vSnap.exists ? vSnap.data() : { dates: [], bp: [], glucose: [], hba1c: [] };
     REC.allergies = aSnap.docs.map(d=>d.data());
     REC.conditions = cSnap.docs.map(d=>d.data().name);
